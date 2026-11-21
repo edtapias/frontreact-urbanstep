@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
@@ -27,6 +26,7 @@ import CarritoService, {
 
 import PedidosService from "../../../services/PedidoService";
 import EnviosService from "../../../services/EnviosService";
+import UsuariosService from "../../../services/UsuariosService";
 
 type MetodoEnvio = "DOMICILIO" | "RETIRO_TIENDA";
 
@@ -35,6 +35,11 @@ interface Usuario {
   nombre: string;
   correo: string;
   rut: string;
+  rol?: string;
+  region?: string | null;
+  comuna?: string | null;
+  direccion?: string | null;
+  referencias?: string | null;
 }
 
 export default function PagoPage() {
@@ -43,15 +48,15 @@ export default function PagoPage() {
   const [carrito, setCarrito] = useState<Carrito | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
 
-  // Datos de facturación
+  // DATOS DE FACTURACIÓN
   const [rut, setRut] = useState("");
   const [nombre, setNombre] = useState("");
   const [direccion, setDireccion] = useState("");
 
-  // Método de pago
+  // MÉTODO DE PAGO
   const [metodoPago, setMetodoPago] = useState("TARJETA_CREDITO");
 
-  // Datos de despacho
+  // DATOS DE DESPACHO
   const [metodoEnvio, setMetodoEnvio] =
     useState<MetodoEnvio>("DOMICILIO");
 
@@ -60,19 +65,22 @@ export default function PagoPage() {
   const [direccionEnvio, setDireccionEnvio] = useState("");
   const [referencias, setReferencias] = useState("");
 
-  // Cotización
+  // COTIZACIÓN
   const [costoEnvio, setCostoEnvio] = useState<number | null>(null);
   const [cotizando, setCotizando] = useState(false);
   const [cotizacionLista, setCotizacionLista] = useState(false);
 
-  // Estados generales
+  // ESTADOS GENERALES
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [errorEnvio, setErrorEnvio] = useState("");
   const [pagoResultado, setPagoResultado] = useState<Pago | null>(null);
 
-  // CARGAR USUARIO Y CARRITO
+  // =====================================================
+  // CARGAR USUARIO, DIRECCIÓN GUARDADA Y CARRITO
+  // =====================================================
+
   useEffect(() => {
     let activo = true;
 
@@ -85,31 +93,45 @@ export default function PagoPage() {
           return;
         }
 
-        const usuarioActual: Usuario = JSON.parse(usuarioGuardado);
+        const usuarioLocal: Usuario = JSON.parse(usuarioGuardado);
 
-        if (!usuarioActual.id) {
+        if (!usuarioLocal.id) {
           throw new Error("No se encontró el ID del usuario.");
         }
 
-        if (activo) {
-          setUsuario(usuarioActual);
-          setRut(usuarioActual.rut || "");
-          setNombre(usuarioActual.nombre || "");
-        }
+        // Obtener los datos actualizados desde la base de datos.
+        const perfil = await UsuariosService.obtener(usuarioLocal.id);
 
-        const carritoActual = await CarritoService.obtener(
-          usuarioActual.id
-        );
+        if (!activo) return;
+
+        setUsuario(perfil);
+
+        // Completar automáticamente los datos de facturación.
+        setRut(perfil.rut || "");
+        setNombre(perfil.nombre || "");
+        setDireccion(perfil.direccion || "");
+
+        // Completar automáticamente los datos de despacho.
+        setRegion(perfil.region || "");
+        setComuna(perfil.comuna || "");
+        setDireccionEnvio(perfil.direccion || "");
+        setReferencias(perfil.referencias || "");
+
+        // Cargar carrito del usuario.
+        const carritoActual = await CarritoService.obtener(perfil.id);
 
         if (activo) {
           setCarrito(carritoActual);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error al cargar los datos:", err);
 
         if (activo) {
           setError(
-            "No fue posible cargar el carrito. Intenta nuevamente."
+            err.response?.data?.message ||
+              err.response?.data?.error ||
+              err.message ||
+              "No fue posible cargar los datos del usuario y del carrito."
           );
         }
       } finally {
@@ -126,7 +148,10 @@ export default function PagoPage() {
     };
   }, [navigate]);
 
+  // =====================================================
   // CAMBIAR MÉTODO DE ENVÍO
+  // =====================================================
+
   function cambiarMetodoEnvio(metodo: MetodoEnvio) {
     setMetodoEnvio(metodo);
     setError("");
@@ -141,7 +166,10 @@ export default function PagoPage() {
     }
   }
 
+  // =====================================================
   // COTIZAR DESPACHO A DOMICILIO
+  // =====================================================
+
   async function cotizarDespacho() {
     if (!region.trim() || !comuna.trim()) {
       setError("Selecciona o ingresa la región y comuna.");
@@ -162,7 +190,9 @@ export default function PagoPage() {
       const costo = Number(cotizacion.costo);
 
       if (!Number.isFinite(costo) || costo < 0) {
-        throw new Error("El servicio devolvió un costo de envío inválido.");
+        throw new Error(
+          "El servicio devolvió un costo de envío inválido."
+        );
       }
 
       setCostoEnvio(costo);
@@ -172,16 +202,19 @@ export default function PagoPage() {
 
       setError(
         err.response?.data?.message ||
-        err.response?.data?.error ||
-        err.message ||
-        "No fue posible calcular el costo del despacho."
+          err.response?.data?.error ||
+          err.message ||
+          "No fue posible calcular el costo del despacho."
       );
     } finally {
       setCotizando(false);
     }
   }
 
+  // =====================================================
   // CONFIRMAR COMPRA Y PROCESAR PAGO
+  // =====================================================
+
   async function confirmarPago(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -207,14 +240,16 @@ export default function PagoPage() {
       return;
     }
 
-    // Validar datos de despacho
+    // Validar datos de despacho.
     if (metodoEnvio === "DOMICILIO") {
       if (
         !region.trim() ||
         !comuna.trim() ||
         !direccionEnvio.trim()
       ) {
-        setError("Completa la región, comuna y dirección de despacho.");
+        setError(
+          "Completa la región, comuna y dirección de despacho."
+        );
         return;
       }
 
@@ -232,8 +267,46 @@ export default function PagoPage() {
     setErrorEnvio("");
 
     try {
-      // 1. CREAR EL PEDIDO.
-      // El backend debe recibir clienteId, costoEnvio y metodoEnvio.
+      // 1. ACTUALIZAR LOS DATOS DEL PERFIL DEL USUARIO.
+      // La dirección queda guardada para futuras compras.
+
+      const datosPerfil = {
+        nombre: nombre.trim(),
+        correo: usuario.correo,
+        rut: rut.trim(),
+
+        region:
+          metodoEnvio === "DOMICILIO"
+            ? region.trim()
+            : usuario.region || "",
+
+        comuna:
+          metodoEnvio === "DOMICILIO"
+            ? comuna.trim()
+            : usuario.comuna || "",
+
+        direccion:
+          metodoEnvio === "DOMICILIO"
+            ? direccionEnvio.trim()
+            : usuario.direccion || direccion.trim(),
+
+        referencias:
+          metodoEnvio === "DOMICILIO"
+            ? referencias.trim()
+            : usuario.referencias || "",
+      };
+
+      const perfilActualizado = await UsuariosService.actualizar(
+        usuario.id,
+        datosPerfil
+      );
+
+      setUsuario(perfilActualizado);
+
+      console.log("Perfil actualizado:", perfilActualizado);
+
+      // 2. CREAR EL PEDIDO.
+
       const pedidoCreado = await PedidosService.crear(
         usuario.id,
         costoFinal,
@@ -246,16 +319,16 @@ export default function PagoPage() {
         throw new Error("No se recibió el ID del pedido creado.");
       }
 
-      // 2. OBTENER LOS PRODUCTOS DEL CARRITO.
+      // 3. OBTENER LOS PRODUCTOS DEL CARRITO.
+
       const productos = carrito.items.map((item) => ({
         zapatillaId: item.productoId,
         talla: String(item.talla),
         cantidad: item.cantidad,
       }));
 
-      // 3. PREPARAR EL PAGO.
-      // Se utiliza el total que devuelve ms-pedidos.
-      // No se suma nuevamente el costo del envío.
+      // 4. PREPARAR EL PAGO.
+
       const datos: PagoRequest = {
         pedidoId: pedidoCreado.id,
         usuarioId: usuario.id,
@@ -269,12 +342,14 @@ export default function PagoPage() {
 
       console.log("Datos enviados al pago:", datos);
 
-      // 4. REGISTRAR EL PAGO.
+      // 5. REGISTRAR EL PAGO.
+
       const pagoCreado = await PagoService.iniciar(datos);
 
       console.log("Pago creado:", pagoCreado);
 
-      // 5. PROCESAR EL PAGO.
+      // 6. PROCESAR EL PAGO.
+
       const resultado = await PagoService.procesar(
         pagoCreado.id,
         true
@@ -282,9 +357,9 @@ export default function PagoPage() {
 
       console.log("Resultado del pago:", resultado);
 
-      // 6. CREAR EL ENVÍO SOLAMENTE SI EL PAGO FUE APROBADO.
+      // 7. CREAR EL ENVÍO SOLAMENTE SI EL PAGO FUE APROBADO.
+
       if (resultado.estado === "APROBADO") {
-        // Guardamos el resultado para no perderlo si falla el envío.
         setPagoResultado(resultado);
 
         // Vaciar el carrito después de aprobarse el pago.
@@ -292,28 +367,38 @@ export default function PagoPage() {
           await CarritoService.vaciar(usuario.id);
         } catch (err) {
           console.error("No se pudo vaciar el carrito:", err);
+
           setErrorEnvio(
             "El pago fue aprobado, pero no se pudo vaciar el carrito. Contacta con soporte antes de volver a comprar."
           );
         }
 
-        // Registrar el envío con el mismo ID real del pedido.
+        // Registrar el envío con el ID real del pedido.
         try {
           await EnviosService.registrar({
             pedidoId: pedidoCreado.id,
             metodoEnvio,
+
             region:
-              metodoEnvio === "DOMICILIO" ? region.trim() : undefined,
+              metodoEnvio === "DOMICILIO"
+                ? region.trim()
+                : undefined,
+
             comuna:
-              metodoEnvio === "DOMICILIO" ? comuna.trim() : undefined,
+              metodoEnvio === "DOMICILIO"
+                ? comuna.trim()
+                : undefined,
+
             direccionCompleta:
               metodoEnvio === "DOMICILIO"
                 ? direccionEnvio.trim()
                 : undefined,
+
             referencias:
               metodoEnvio === "DOMICILIO"
                 ? referencias.trim()
                 : undefined,
+
             costo: costoFinal,
           });
 
@@ -347,7 +432,10 @@ export default function PagoPage() {
     }
   }
 
+  // =====================================================
   // FORMATO DE PRECIO
+  // =====================================================
+
   const formatoPrecio = (valor: number) =>
     Number(valor).toLocaleString("es-CL", {
       style: "currency",
@@ -361,11 +449,15 @@ export default function PagoPage() {
       ? 0
       : Number(costoEnvio || 0));
 
-  // CARGANDO
+  // =====================================================
+  // PANTALLA DE CARGA
+  // =====================================================
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Loader2 className="animate-spin text-black" size={40} />
+
         <span className="ml-3 text-gray-600">
           Cargando pago...
         </span>
@@ -373,7 +465,10 @@ export default function PagoPage() {
     );
   }
 
+  // =====================================================
   // RESULTADO DEL PAGO
+  // =====================================================
+
   if (pagoResultado) {
     const aprobado = pagoResultado.estado === "APROBADO";
 
@@ -433,8 +528,11 @@ export default function PagoPage() {
 
             <div className="flex justify-between">
               <span className="text-gray-500">Estado del pago</span>
+
               <strong
-                className={aprobado ? "text-green-600" : "text-red-600"}
+                className={
+                  aprobado ? "text-green-600" : "text-red-600"
+                }
               >
                 {pagoResultado.estado}
               </strong>
@@ -442,6 +540,7 @@ export default function PagoPage() {
 
             <div className="flex justify-between">
               <span className="text-gray-500">Tipo de entrega</span>
+
               <strong>
                 {metodoEnvio === "DOMICILIO"
                   ? "Despacho a domicilio"
@@ -470,7 +569,10 @@ export default function PagoPage() {
     );
   }
 
+  // =====================================================
   // CARRITO VACÍO
+  // =====================================================
+
   if (!carrito || !carrito.items || carrito.items.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50">
@@ -493,7 +595,10 @@ export default function PagoPage() {
     );
   }
 
+  // =====================================================
   // FORMULARIO DE PAGO
+  // =====================================================
+
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-6xl mx-auto">
@@ -520,9 +625,11 @@ export default function PagoPage() {
         >
           <div className="lg:col-span-2 space-y-6">
             {/* DATOS DE FACTURACIÓN */}
+
             <section className="bg-white rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <Receipt size={22} />
+
                 <h2 className="text-xl font-bold">
                   Datos de facturación
                 </h2>
@@ -578,9 +685,11 @@ export default function PagoPage() {
             </section>
 
             {/* MÉTODO DE ENTREGA */}
+
             <section className="bg-white rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <Truck size={22} />
+
                 <h2 className="text-xl font-bold">
                   Método de entrega
                 </h2>
@@ -597,8 +706,12 @@ export default function PagoPage() {
                   }`}
                 >
                   <Truck size={22} />
+
                   <div>
-                    <p className="font-semibold">Despacho a domicilio</p>
+                    <p className="font-semibold">
+                      Despacho a domicilio
+                    </p>
+
                     <p className="text-sm text-gray-500">
                       Recibe tu compra en casa
                     </p>
@@ -615,8 +728,12 @@ export default function PagoPage() {
                   }`}
                 >
                   <Store size={22} />
+
                   <div>
-                    <p className="font-semibold">Retiro en tienda</p>
+                    <p className="font-semibold">
+                      Retiro en tienda
+                    </p>
+
                     <p className="text-sm text-gray-500">
                       Sin costo de envío
                     </p>
@@ -676,7 +793,9 @@ export default function PagoPage() {
                     <input
                       type="text"
                       value={direccionEnvio}
-                      onChange={(e) => setDireccionEnvio(e.target.value)}
+                      onChange={(e) =>
+                        setDireccionEnvio(e.target.value)
+                      }
                       placeholder="Ejemplo: Avenida principal 123"
                       className="w-full border border-gray-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-black"
                       required
@@ -718,6 +837,7 @@ export default function PagoPage() {
                       <span className="text-green-800">
                         Costo de despacho
                       </span>
+
                       <strong className="text-green-800">
                         {formatoPrecio(costoEnvio)}
                       </strong>
@@ -731,6 +851,7 @@ export default function PagoPage() {
                   <p className="font-semibold text-green-800">
                     Retiro en tienda sin costo
                   </p>
+
                   <p className="text-sm text-green-700 mt-1">
                     Tu pedido quedará preparado para que puedas retirarlo
                     en la tienda.
@@ -740,9 +861,11 @@ export default function PagoPage() {
             </section>
 
             {/* MÉTODO DE PAGO */}
+
             <section className="bg-white rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <CreditCard size={22} />
+
                 <h2 className="text-xl font-bold">
                   Método de pago
                 </h2>
@@ -790,6 +913,7 @@ export default function PagoPage() {
 
               <div className="mt-5 flex gap-2 text-sm text-gray-500">
                 <ShieldCheck size={19} className="shrink-0" />
+
                 <p>
                   Este proyecto utiliza una simulación de procesamiento
                   de pagos. No ingreses datos reales de tarjetas.
@@ -799,6 +923,7 @@ export default function PagoPage() {
           </div>
 
           {/* RESUMEN DE COMPRA */}
+
           <aside className="bg-white rounded-2xl p-6 shadow-sm h-fit">
             <h2 className="text-xl font-bold mb-6">
               Resumen de compra
@@ -831,6 +956,7 @@ export default function PagoPage() {
 
             <div className="flex justify-between text-gray-600 mb-3">
               <span>Subtotal</span>
+
               <span>
                 {formatoPrecio(Number(carrito.subtotal))}
               </span>
@@ -838,6 +964,7 @@ export default function PagoPage() {
 
             <div className="flex justify-between text-gray-600 mb-3">
               <span>IVA</span>
+
               <span>
                 {formatoPrecio(Number(carrito.iva))}
               </span>
@@ -845,6 +972,7 @@ export default function PagoPage() {
 
             <div className="flex justify-between text-gray-600 mb-3">
               <span>Despacho</span>
+
               <span>
                 {metodoEnvio === "RETIRO_TIENDA"
                   ? "Gratis"
@@ -858,6 +986,7 @@ export default function PagoPage() {
 
             <div className="flex justify-between font-bold text-xl mt-5">
               <span>Total</span>
+
               <span>{formatoPrecio(totalFinal)}</span>
             </div>
 

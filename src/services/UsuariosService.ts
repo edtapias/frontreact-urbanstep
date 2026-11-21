@@ -25,6 +25,10 @@ export interface ActualizarPerfilDTO {
   nombre: string;
   correo: string;
   rut: string;
+  region?: string;
+  comuna?: string;
+  direccion?: string;
+  referencias?: string;
 }
 
 export interface Usuario {
@@ -33,21 +37,31 @@ export interface Usuario {
   nombre: string;
   correo: string;
   rol: string;
+  region?: string | null;
+  comuna?: string | null;
+  direccion?: string | null;
+  referencias?: string | null;
 }
 
 const UsuariosService = {
   registrar: async (datos: RegistroUsuarioDTO): Promise<Usuario> => {
-    const respuesta = await usuariosApi.post("/registro", datos);
+    const respuesta = await usuariosApi.post<Usuario>(
+      "/registro",
+      datos
+    );
     return respuesta.data;
   },
 
   iniciarSesion: async (datos: LoginDTO): Promise<Usuario> => {
-    const respuesta = await usuariosApi.post("/login", datos);
+    const respuesta = await usuariosApi.post<Usuario>(
+      "/login",
+      datos
+    );
     return respuesta.data;
   },
 
   obtener: async (id: number): Promise<Usuario> => {
-    const respuesta = await usuariosApi.get(`/${id}`);
+    const respuesta = await usuariosApi.get<Usuario>(`/${id}`);
     return respuesta.data;
   },
 
@@ -55,7 +69,10 @@ const UsuariosService = {
     id: number,
     datos: ActualizarPerfilDTO
   ): Promise<Usuario> => {
-    const respuesta = await usuariosApi.put(`/${id}`, datos);
+    const respuesta = await usuariosApi.put<Usuario>(
+      `/${id}`,
+      datos
+    );
     return respuesta.data;
   },
 };

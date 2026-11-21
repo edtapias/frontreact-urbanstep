@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import useProductos from "../../../hooks/useProductos";
@@ -59,6 +59,54 @@ export default function ProductosPage() {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  // REFERENCIA Y ESTADO DE LA IMAGEN
+  const inputImagenRef = useRef<HTMLInputElement>(null);
+  const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
+  const [vistaPrevia, setVistaPrevia] = useState("");
+
+  // SELECCIONAR IMAGEN DESDE EL COMPUTADOR
+  const seleccionarImagen = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const archivo = event.target.files?.[0];
+
+    if (!archivo) return;
+
+    const formatosPermitidos = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!formatosPermitidos.includes(archivo.type)) {
+      alert("Selecciona una imagen JPG, PNG o WEBP.");
+      event.target.value = "";
+      return;
+    }
+
+    if (archivo.size > 5 * 1024 * 1024) {
+      alert("La imagen no puede superar los 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setArchivoImagen(archivo);
+
+    const lector = new FileReader();
+
+    lector.onload = () => {
+      if (typeof lector.result === "string") {
+        setVistaPrevia(lector.result);
+      }
+    };
+
+    lector.onerror = () => {
+      alert("No se pudo leer la imagen seleccionada.");
+    };
+
+    lector.readAsDataURL(archivo);
+  };
 
   // Cargar inventario
   const cargarInventario = useCallback(async () => {
@@ -178,6 +226,13 @@ export default function ProductosPage() {
     setTallas([{ talla: "", stock: 0 }]);
     setProductoEditando(null);
     setMostrarFormulario(false);
+
+    setArchivoImagen(null);
+    setVistaPrevia("");
+
+    if (inputImagenRef.current) {
+      inputImagenRef.current.value = "";
+    }
   };
 
   // Editar producto
@@ -196,6 +251,13 @@ export default function ProductosPage() {
         nombre: producto.categoria.nombre,
       },
     });
+
+    setArchivoImagen(null);
+    setVistaPrevia("");
+
+    if (inputImagenRef.current) {
+      inputImagenRef.current.value = "";
+    }
 
     setTallas([
       {
@@ -252,10 +314,18 @@ export default function ProductosPage() {
 
     if (
       !formulario.nombre.trim() ||
-      !formulario.marca.trim() ||
-      !formulario.imagenUrl.trim()
+      !formulario.marca.trim()
     ) {
-      alert("Completa el nombre, la marca y la imagen del producto.");
+      alert("Completa el nombre y la marca del producto.");
+      return;
+    }
+
+    // Para registrar, debe existir una imagen seleccionada
+    // o una imagen anterior del producto.
+    const imagenFinal = vistaPrevia || formulario.imagenUrl;
+
+    if (!imagenFinal.trim()) {
+      alert("Debes seleccionar una imagen para la zapatilla.");
       return;
     }
 
@@ -281,14 +351,16 @@ export default function ProductosPage() {
       for (let i = 0; i < tallasNormalizadas.length; i++) {
         const variante = tallasNormalizadas[i];
 
-        // Payload con la misma estructura del catálogo original
         const payload: ProductoPayload = {
           nombre: formulario.nombre.trim(),
           marca: formulario.marca.trim(),
           color: formulario.color.trim(),
           precio: Number(formulario.precio),
           stock: variante.stock,
-          imagenUrl: formulario.imagenUrl.trim(),
+
+          // Se envía la imagen seleccionada como Data URL.
+          imagenUrl: imagenFinal,
+
           talla: variante.talla,
           destacado: Boolean(formulario.destacado),
           categoria: {
@@ -300,7 +372,6 @@ export default function ProductosPage() {
         let zapatillaId: number;
 
         if (productoEditando !== null && i === 0) {
-          // Actualizar la primera talla existente
           const actualizado = await actualizar(
             productoEditando,
             payload
@@ -314,7 +385,6 @@ export default function ProductosPage() {
 
           zapatillaId = productoEditando;
         } else {
-          // Crear un registro independiente para cada talla adicional
           const nuevoProducto = await crear(payload);
 
           if (!nuevoProducto) {
@@ -326,7 +396,6 @@ export default function ProductosPage() {
           zapatillaId = nuevoProducto.id;
         }
 
-        // Actualizar stock del inventario
         await InventarioService.actualizarStock(
           zapatillaId,
           variante.talla,
@@ -568,6 +637,7 @@ export default function ProductosPage() {
                 />
               </div>
 
+              {/* NOMBRE CATEGORÍA */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Nombre de categoría
@@ -590,40 +660,51 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* IMAGEN */}
+              {/* SELECCIONAR IMAGEN */}
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium">
-                  Ruta o URL de imagen
+                <label className="mb-2 block text-sm font-medium">
+                  Imagen de la zapatilla
                 </label>
 
                 <input
-                  required
-                  type="text"
-                  value={formulario.imagenUrl}
-                  onChange={(e) =>
-                    cambiarCampo("imagenUrl", e.target.value)
-                  }
-                  className="w-full rounded-lg border p-3 outline-none focus:border-black"
-                  placeholder="/imagenes/ultraboost.jpg"
+                  ref={inputImagenRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={seleccionarImagen}
+                  className="hidden"
                 />
 
-                <p className="mt-1 text-xs text-gray-500">
-                  Puedes usar una ruta local o una URL completa.
-                </p>
+                {(vistaPrevia || formulario.imagenUrl) && (
+                  <div className="mb-4">
+                    <img
+                      src={vistaPrevia || formulario.imagenUrl}
+                      alt="Vista previa de zapatilla"
+                      className="h-44 w-44 rounded-xl border bg-gray-50 object-contain p-2"
+                    />
 
-                {formulario.imagenUrl && (
-                  <img
-                    src={formulario.imagenUrl}
-                    alt="Vista previa"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                    onLoad={(e) => {
-                      e.currentTarget.style.display = "block";
-                    }}
-                    className="mt-3 h-32 w-32 rounded-lg border object-cover"
-                  />
+                    <p className="mt-2 text-sm text-gray-500">
+                      {archivoImagen?.name ||
+                        "Imagen actual del producto"}
+                    </p>
+                  </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => inputImagenRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-5 font-semibold text-gray-700 transition hover:border-black hover:bg-gray-50"
+                >
+                  <span className="text-xl">📷</span>
+
+                  {archivoImagen
+                    ? "Cambiar zapatilla"
+                    : "Seleccionar zapatilla"}
+                </button>
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Selecciona una fotografía JPG, PNG o WEBP desde tu
+                  computador. Tamaño máximo: 5 MB.
+                </p>
               </div>
 
               {/* TALLAS Y STOCK */}
