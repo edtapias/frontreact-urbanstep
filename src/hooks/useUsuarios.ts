@@ -13,9 +13,11 @@ export interface UsuarioAdmin {
 
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
+  const [todosUsuarios, setTodosUsuarios] = useState<UsuarioAdmin[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
+  // CARGAR TODOS LOS USUARIOS DESDE EL BACKEND
   const cargarUsuarios = useCallback(async () => {
     try {
       setCargando(true);
@@ -24,6 +26,10 @@ export function useUsuarios() {
       const response = await usuariosApi.get("");
 
       setUsuarios(response.data);
+      setTodosUsuarios(response.data);
+
+      console.log("Usuarios cargados:", response.data);
+
     } catch (err) {
       console.error("Error al cargar usuarios:", err);
       setError("No fue posible cargar los usuarios.");
@@ -32,37 +38,48 @@ export function useUsuarios() {
     }
   }, []);
 
-  const buscarUsuarios = useCallback(async (texto: string) => {
-    try {
-      setCargando(true);
-      setError("");
+  // BUSCAR USUARIOS POR NOMBRE, RUT, CORREO O ROL
+  const buscarUsuarios = useCallback(
+    (texto: string) => {
+      const busqueda = texto.trim().toLowerCase();
 
-      if (!texto.trim()) {
-        await cargarUsuarios();
+      if (!busqueda) {
+        setUsuarios(todosUsuarios);
+        setError("");
         return;
       }
 
-      const response = await usuariosApi.get("/admin/buscar", {
-        params: { texto },
+      const resultado = todosUsuarios.filter((usuario) => {
+        return (
+          usuario.nombre?.toLowerCase().includes(busqueda) ||
+          usuario.correo?.toLowerCase().includes(busqueda) ||
+          usuario.rut?.toLowerCase().includes(busqueda) ||
+          usuario.rol?.toLowerCase().includes(busqueda)
+        );
       });
 
-      setUsuarios(response.data);
-    } catch (err) {
-      console.error("Error al buscar usuarios:", err);
-      setError("No fue posible buscar los usuarios.");
-    } finally {
-      setCargando(false);
-    }
-  }, [cargarUsuarios]);
+      setUsuarios(resultado);
+    },
+    [todosUsuarios]
+  );
 
+  // ACTUALIZAR USUARIO
   const actualizarUsuario = async (
     rut: string,
     datos: Partial<UsuarioAdmin>
   ) => {
     try {
-      await usuariosApi.put(`/admin/${encodeURIComponent(rut)}`, datos);
+      setError("");
+
+      await usuariosApi.put(
+        `/${encodeURIComponent(rut)}`,
+        datos
+      );
+
       await cargarUsuarios();
+
       return true;
+
     } catch (err) {
       console.error("Error al actualizar usuario:", err);
       setError("No fue posible actualizar el usuario.");
@@ -70,27 +87,24 @@ export function useUsuarios() {
     }
   };
 
-  const desactivarUsuario = async (rut: string) => {
-    try {
-      await usuariosApi.patch(
-        `/admin/${encodeURIComponent(rut)}/desactivar`
-      );
+  // DESACTIVAR USUARIO
+  // Pendiente: implementar el endpoint correspondiente en el backend.
+  const desactivarUsuario = async (_rut: string) => {
+    setError(
+      "La función de desactivar usuarios todavía no está implementada en el backend."
+    );
 
-      await cargarUsuarios();
-      return true;
-    } catch (err) {
-      console.error("Error al desactivar usuario:", err);
-      setError("No fue posible desactivar el usuario.");
-      return false;
-    }
+    return false;
   };
 
+  // CARGAR USUARIOS AL INICIAR EL HOOK
   useEffect(() => {
     cargarUsuarios();
   }, [cargarUsuarios]);
 
   return {
     usuarios,
+    todosUsuarios,
     cargando,
     error,
     cargarUsuarios,
