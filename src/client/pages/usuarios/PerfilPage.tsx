@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   UserRound,
@@ -10,6 +11,7 @@ import {
   Loader2,
   Package,
   RefreshCw,
+  MapPin,
 } from "lucide-react";
 
 import UsuariosService from "../../../services/UsuariosService";
@@ -22,43 +24,80 @@ export default function PerfilPage() {
   const navigate = useNavigate();
 
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+
+  // Datos personales
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [rut, setRut] = useState("");
 
+  // Datos de dirección
+  const [region, setRegion] = useState("");
+  const [comuna, setComuna] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [referencias, setReferencias] = useState("");
+
+  // Pedidos
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargandoPedidos, setCargandoPedidos] = useState(false);
 
+  // Estados generales
   const [cargando, setCargando] = useState(false);
+  const [cargandoPerfil, setCargandoPerfil] = useState(true);
   const [error, setError] = useState("");
   const [errorPedidos, setErrorPedidos] = useState("");
 
-  // Cargar usuario y su historial.
+  // Cargar usuario desde la base de datos
   useEffect(() => {
-    const usuarioGuardado = localStorage.getItem("usuario");
+    const cargarPerfil = async () => {
+      const usuarioGuardado = localStorage.getItem("usuario");
 
-    if (!usuarioGuardado) {
-      navigate("/login");
-      return;
-    }
+      if (!usuarioGuardado) {
+        navigate("/login");
+        return;
+      }
 
-    try {
-      const datos: Usuario = JSON.parse(usuarioGuardado);
+      try {
+        const datos: Usuario = JSON.parse(usuarioGuardado);
 
-      setUsuario(datos);
-      setNombre(datos.nombre);
-      setCorreo(datos.correo);
-      setRut(datos.rut);
+        if (!datos.id) {
+          throw new Error("No se encontró el ID del usuario.");
+        }
 
-      cargarPedidos(datos.id);
-    } catch (err) {
-      console.error("Error al cargar usuario:", err);
-      localStorage.removeItem("usuario");
-      navigate("/login");
-    }
+        // Consultar los datos actualizados del backend
+        const respuesta = await UsuariosService.obtener(datos.id);
+
+        setUsuario(respuesta);
+
+        setNombre(respuesta.nombre || "");
+        setCorreo(respuesta.correo || "");
+        setRut(respuesta.rut || "");
+
+        // Cargar dirección guardada
+        setRegion(respuesta.region || "");
+        setComuna(respuesta.comuna || "");
+        setDireccion(respuesta.direccion || "");
+        setReferencias(respuesta.referencias || "");
+
+        // Actualizar localStorage
+        localStorage.setItem("usuario", JSON.stringify(respuesta));
+
+        // Cargar historial de pedidos
+        cargarPedidos(respuesta.id);
+      } catch (err) {
+        console.error("Error al cargar perfil:", err);
+
+        setError(
+          "No se pudo cargar tu perfil. Intenta iniciar sesión nuevamente."
+        );
+      } finally {
+        setCargandoPerfil(false);
+      }
+    };
+
+    cargarPerfil();
   }, [navigate]);
 
-  // Consultar pedidos del cliente.
+  // Consultar pedidos del cliente
   const cargarPedidos = async (clienteId: number) => {
     try {
       setCargandoPedidos(true);
@@ -73,16 +112,16 @@ export default function PerfilPage() {
 
       setErrorPedidos(
         err.response?.data?.message ||
-        "No se pudo cargar tu historial de pedidos."
+          "No se pudo cargar tu historial de pedidos."
       );
     } finally {
       setCargandoPedidos(false);
     }
   };
 
-  // Guardar información del perfil.
+  // Guardar información del perfil y dirección
   const guardarCambios = async (
-    e: React.FormEvent<HTMLFormElement>
+    e: FormEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
 
@@ -95,33 +134,51 @@ export default function PerfilPage() {
       const respuesta = await UsuariosService.actualizar(
         usuario.id,
         {
-          nombre,
-          correo,
-          rut,
+          nombre: nombre.trim(),
+          correo: correo.trim(),
+          rut: rut.trim(),
+          region: region.trim(),
+          comuna: comuna.trim(),
+          direccion: direccion.trim(),
+          referencias: referencias.trim(),
         }
       );
 
+      // Actualizar información en pantalla
       setUsuario(respuesta);
+
+      // Actualizar información guardada en el navegador
       localStorage.setItem("usuario", JSON.stringify(respuesta));
 
-      alert("Perfil actualizado correctamente.");
+      // Sincronizar los campos con la respuesta del backend
+      setNombre(respuesta.nombre || "");
+      setCorreo(respuesta.correo || "");
+      setRut(respuesta.rut || "");
+      setRegion(respuesta.region || "");
+      setComuna(respuesta.comuna || "");
+      setDireccion(respuesta.direccion || "");
+      setReferencias(respuesta.referencias || "");
+
+      alert("Perfil y dirección actualizados correctamente.");
     } catch (err: any) {
-      console.error(err);
+      console.error("Error al actualizar perfil:", err);
 
       setError(
         err.response?.data?.message ||
-        "No se pudieron guardar los cambios."
+          "No se pudieron guardar los cambios. Intenta nuevamente."
       );
     } finally {
       setCargando(false);
     }
   };
 
+  // Cerrar sesión
   const cerrarSesion = () => {
     localStorage.removeItem("usuario");
     navigate("/login");
   };
 
+  // Formato de precios
   const formatoPrecio = (valor: number) =>
     Number(valor).toLocaleString("es-CL", {
       style: "currency",
@@ -129,6 +186,7 @@ export default function PerfilPage() {
       maximumFractionDigits: 0,
     });
 
+  // Colores según estado del pedido
   const colorEstado = (estado: string) => {
     switch (estado) {
       case "PAGADO":
@@ -148,10 +206,33 @@ export default function PerfilPage() {
     }
   };
 
-  if (!usuario) {
+  // Pantalla de carga
+  if (cargandoPerfil) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F3EF]">
-        <p className="text-[#77716A]">Cargando perfil...</p>
+        <Loader2 className="animate-spin" size={30} />
+        <span className="ml-3 text-[#77716A]">
+          Cargando perfil...
+        </span>
+      </main>
+    );
+  }
+
+  if (!usuario) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F3EF] px-4">
+        <div className="text-center">
+          <p className="mb-4 text-red-700">
+            {error || "No se pudo cargar tu perfil."}
+          </p>
+
+          <button
+            onClick={() => navigate("/login")}
+            className="rounded-lg bg-[#393632] px-6 py-3 text-white"
+          >
+            Volver al inicio de sesión
+          </button>
+        </div>
       </main>
     );
   }
@@ -207,6 +288,8 @@ export default function PerfilPage() {
             </div>
 
             <form onSubmit={guardarCambios} className="space-y-5">
+
+              {/* NOMBRE */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Nombre completo
@@ -220,6 +303,7 @@ export default function PerfilPage() {
                 />
               </div>
 
+              {/* RUT */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   RUT
@@ -233,6 +317,7 @@ export default function PerfilPage() {
                 />
               </div>
 
+              {/* CORREO */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Correo electrónico
@@ -247,6 +332,7 @@ export default function PerfilPage() {
                 />
               </div>
 
+              {/* ROL */}
               <div className="rounded-lg bg-[#F5F3EF] p-4">
                 <p className="text-xs text-[#77716A]">
                   Rol de usuario
@@ -257,19 +343,104 @@ export default function PerfilPage() {
                 </p>
               </div>
 
+              {/* DIRECCIÓN */}
+              <div className="border-t border-[#E5E0D8] pt-6">
+                <div className="mb-5 flex items-center gap-3">
+                  <MapPin size={23} className="text-[#766B5D]" />
+
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#393632]">
+                      Dirección de despacho
+                    </h2>
+
+                    <p className="mt-1 text-sm text-[#77716A]">
+                      Guarda tu dirección para utilizarla en tus próximas compras.
+                    </p>
+                  </div>
+                </div>
+
+                {/* REGIÓN */}
+                <div className="mb-5">
+                  <label className="mb-1 block text-sm font-medium">
+                    Región
+                  </label>
+
+                  <input
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    placeholder="Ejemplo: Biobío"
+                    className="w-full rounded-lg border border-[#E5E0D8] px-4 py-3 outline-none focus:border-[#766B5D]"
+                  />
+                </div>
+
+                {/* COMUNA */}
+                <div className="mb-5">
+                  <label className="mb-1 block text-sm font-medium">
+                    Comuna
+                  </label>
+
+                  <input
+                    value={comuna}
+                    onChange={(e) => setComuna(e.target.value)}
+                    placeholder="Ejemplo: Coronel"
+                    className="w-full rounded-lg border border-[#E5E0D8] px-4 py-3 outline-none focus:border-[#766B5D]"
+                  />
+                </div>
+
+                {/* DIRECCIÓN */}
+                <div className="mb-5">
+                  <label className="mb-1 block text-sm font-medium">
+                    Dirección
+                  </label>
+
+                  <input
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    placeholder="Calle, número y departamento"
+                    className="w-full rounded-lg border border-[#E5E0D8] px-4 py-3 outline-none focus:border-[#766B5D]"
+                  />
+                </div>
+
+                {/* REFERENCIAS */}
+                <div className="mb-5">
+                  <label className="mb-1 block text-sm font-medium">
+                    Referencias adicionales (opcional)
+                  </label>
+
+                  <textarea
+                    value={referencias}
+                    onChange={(e) => setReferencias(e.target.value)}
+                    placeholder="Ejemplo: Casa blanca, portón negro, cerca de la plaza."
+                    rows={3}
+                    className="w-full resize-y rounded-lg border border-[#E5E0D8] px-4 py-3 outline-none focus:border-[#766B5D]"
+                  />
+                </div>
+              </div>
+
+              {/* MENSAJE DE ERROR */}
               {error && (
                 <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
                   {error}
                 </p>
               )}
 
+              {/* GUARDAR */}
               <button
                 type="submit"
                 disabled={cargando}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#393632] py-3 font-semibold text-white transition hover:bg-[#766B5D] disabled:opacity-50"
               >
-                <Save size={18} />
-                {cargando ? "Guardando..." : "Guardar cambios"}
+                {cargando ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Guardando cambios...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    Guardar cambios
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -281,6 +452,7 @@ export default function PerfilPage() {
             <div>
               <div className="flex items-center gap-3">
                 <ShoppingBag size={23} />
+
                 <h2 className="text-xl font-bold">
                   Mis pedidos
                 </h2>
@@ -308,6 +480,7 @@ export default function PerfilPage() {
             {cargandoPedidos ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="animate-spin" size={30} />
+
                 <span className="ml-3 text-[#77716A]">
                   Cargando tus pedidos...
                 </span>
@@ -387,7 +560,7 @@ export default function PerfilPage() {
                           <span className="whitespace-nowrap">
                             {formatoPrecio(
                               detalle.precioUnitario *
-                              detalle.cantidad
+                                detalle.cantidad
                             )}
                           </span>
                         </div>
