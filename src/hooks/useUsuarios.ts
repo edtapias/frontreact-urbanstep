@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import usuariosApi from "../../client/api/usuariosApi";
+import usuariosApi from "../client/api/usuariosApi";
 
 export interface UsuarioAdmin {
   id?: number;
@@ -21,7 +21,7 @@ export function useUsuarios() {
       setCargando(true);
       setError("");
 
-      const response = await usuariosApi.get("/admin");
+      const response = await usuariosApi.get("");
 
       setUsuarios(response.data);
     } catch (err) {

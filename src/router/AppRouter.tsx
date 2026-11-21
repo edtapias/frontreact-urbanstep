@@ -17,6 +17,7 @@ import AdminPedidosPage from "../admin/pages/AdminPedidosPage";
 import AdminResenasPage from "../admin/pages/AdminResenasPage";
 import AdminEnviosPage from "../admin/pages/envios/AdminEnviosPage";
 import ReportesPage from "../admin/pages/ReportesPage";
+import UsuariosAdminPage from "../admin/pages/usuarios/UsuariosAdminPage";
 
 import LoginPage from "../client/pages/usuarios/LoginPage";
 import RegisterPage from "../client/pages/usuarios/RegisterPage";
@@ -26,6 +27,7 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+
         {/* TIENDA CLIENTE */}
         <Route path="/" element={<ClientLayout />}>
           <Route index element={<HomePage />} />
@@ -46,11 +48,13 @@ export default function AppRouter() {
           <Route index element={<AdminPage />} />
           <Route path="productos" element={<ProductosPage />} />
           <Route path="inventario" element={<InventarioPage />} />
+          <Route path="usuarios" element={<UsuariosAdminPage />} />
           <Route path="pedidos" element={<AdminPedidosPage />} />
           <Route path="envios" element={<AdminEnviosPage />} />
           <Route path="resenas" element={<AdminResenasPage />} />
           <Route path="reportes" element={<ReportesPage />} />
         </Route>
+
       </Routes>
     </BrowserRouter>
   );
