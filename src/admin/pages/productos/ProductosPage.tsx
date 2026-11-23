@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -49,6 +48,10 @@ export default function ProductosPage() {
 
   const [formulario, setFormulario] =
     useState<ProductoPayload>(formularioInicial);
+
+  // El precio se maneja como texto para poder dejar el campo vacío
+  // mientras se escribe, en lugar de mostrar siempre un 0.
+  const [precioTexto, setPrecioTexto] = useState("");
 
   const [tallas, setTallas] = useState<TallaStock[]>([
     { talla: "", stock: 0 },
@@ -223,6 +226,7 @@ export default function ProductosPage() {
       categoria: { ...formularioInicial.categoria },
     });
 
+    setPrecioTexto("");
     setTallas([{ talla: "", stock: 0 }]);
     setProductoEditando(null);
     setMostrarFormulario(false);
@@ -251,6 +255,8 @@ export default function ProductosPage() {
         nombre: producto.categoria.nombre,
       },
     });
+
+    setPrecioTexto(producto.precio ? String(producto.precio) : "");
 
     setArchivoImagen(null);
     setVistaPrevia("");
@@ -605,10 +611,16 @@ export default function ProductosPage() {
                   type="number"
                   min="0.01"
                   step="0.01"
-                  value={formulario.precio}
-                  onChange={(e) =>
-                    cambiarCampo("precio", Number(e.target.value))
-                  }
+                  placeholder="Ej: 49990"
+                  value={precioTexto}
+                  onChange={(e) => {
+                    const valor = e.target.value;
+                    setPrecioTexto(valor);
+                    cambiarCampo(
+                      "precio",
+                      valor === "" ? 0 : Number(valor)
+                    );
+                  }}
                   className="w-full rounded-lg border p-3 outline-none focus:border-black"
                 />
               </div>
