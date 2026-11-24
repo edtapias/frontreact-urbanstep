@@ -1,21 +1,14 @@
-
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Estrellas from "./Estrellas";
 import { useResenas } from "../../hooks/useResenas";
+import PedidosService, { type Pedido } from "../../services/PedidoService";
 
 interface Props {
   zapatillaId: number;
 }
 
-interface Pedido {
-  id: number;
-  clienteId: number;
-  estado: string;
-  detalles: {
-    productoId: number;
-  }[];
-}
+const ESTADOS_PERMITIDOS = ["PAGADO", "ENVIADO", "ENTREGADO"];
 
 export default function ResenasSection({ zapatillaId }: Props) {
   const {
@@ -38,12 +31,19 @@ export default function ResenasSection({ zapatillaId }: Props) {
   const [cargandoPedidos, setCargandoPedidos] = useState(true);
 
   useEffect(() => {
+    let activo = true;
+
     const cargarPedidos = async () => {
+      // Limpiar cualquier compra de una zapatilla anterior.
+      setPedidosDisponibles([]);
+      setPedidoId(null);
+      setMensaje("");
+      setCargandoPedidos(true);
+
       try {
         const usuarioGuardado = localStorage.getItem("usuario");
 
         if (!usuarioGuardado) {
-          setCargandoPedidos(false);
           return;
         }
 
@@ -51,25 +51,27 @@ export default function ResenasSection({ zapatillaId }: Props) {
         const id = Number(usuario.id ?? usuario.usuarioId);
 
         if (!id || Number.isNaN(id)) {
-          setCargandoPedidos(false);
           return;
         }
 
         setUsuarioId(id);
 
-        const respuesta = await fetch(`/api/pedidos/cliente/${id}`);
+        const pedidos = await PedidosService.listarPorCliente(id);
 
-        if (!respuesta.ok) {
-          throw new Error("No se pudieron consultar tus pedidos");
-        }
+        if (!activo) return;
 
-        const pedidos: Pedido[] = await respuesta.json();
-
-        const pedidosValidos = pedidos.filter((pedido) =>
-          pedido.estado === "ENTREGADO" &&
-          pedido.detalles?.some(
-            (detalle) => Number(detalle.productoId) === zapatillaId
-          )
+        // Solo se permite reseñar si el pedido es del usuario,
+        // está pagado (o enviado/entregado) y contiene esta zapatilla.
+        const pedidosValidos = pedidos.filter(
+          (pedido) =>
+            String(pedido.clienteId) === String(id) &&
+            ESTADOS_PERMITIDOS.includes(
+              String(pedido.estado).toUpperCase().trim()
+            ) &&
+            pedido.detalles?.some(
+              (detalle) =>
+                String(detalle.productoId).trim() === String(zapatillaId)
+            )
         );
 
         setPedidosDisponibles(pedidosValidos);
@@ -78,13 +80,21 @@ export default function ResenasSection({ zapatillaId }: Props) {
           setPedidoId(pedidosValidos[0].id);
         }
       } catch {
-        setMensaje("No se pudieron consultar tus compras.");
+        if (activo) {
+          setMensaje("No se pudieron consultar tus compras.");
+        }
       } finally {
-        setCargandoPedidos(false);
+        if (activo) {
+          setCargandoPedidos(false);
+        }
       }
     };
 
     cargarPedidos();
+
+    return () => {
+      activo = false;
+    };
   }, [zapatillaId]);
 
   const enviarResena = async (e: FormEvent<HTMLFormElement>) => {
@@ -96,8 +106,11 @@ export default function ResenasSection({ zapatillaId }: Props) {
       return;
     }
 
-    if (!pedidoId) {
-      setMensaje("No tienes una compra entregada de esta zapatilla.");
+    if (
+      !pedidoId ||
+      !pedidosDisponibles.some((pedido) => pedido.id === pedidoId)
+    ) {
+      setMensaje("No tienes una compra pagada de esta zapatilla.");
       return;
     }
 
@@ -121,6 +134,13 @@ export default function ResenasSection({ zapatillaId }: Props) {
         setMensaje("¡Reseña enviada! Quedará pendiente de aprobación.");
         setComentario("");
         setPuntuacion(5);
+
+        // Ese pedido ya fue usado: no permite otra reseña.
+        const restantes = pedidosDisponibles.filter(
+          (pedido) => pedido.id !== pedidoId
+        );
+        setPedidosDisponibles(restantes);
+        setPedidoId(restantes.length > 0 ? restantes[0].id : null);
       } else {
         setMensaje("No se pudo enviar la reseña. Inténtalo nuevamente.");
       }
@@ -157,7 +177,7 @@ export default function ResenasSection({ zapatillaId }: Props) {
           </p>
         ) : pedidosDisponibles.length === 0 ? (
           <p className="text-sm text-gray-600">
-            Solo puedes reseñar esta zapatilla si la compraste y recibiste tu pedido.
+            Solo puedes reseñar esta zapatilla si ya realizaste y pagaste tu compra.
           </p>
         ) : (
           <form onSubmit={enviarResena}>
