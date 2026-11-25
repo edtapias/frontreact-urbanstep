@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Search, Heart, ShoppingBag, ArrowRight, X, Plus, Minus } from "lucide-react";
@@ -46,7 +45,7 @@ export default function HomePage() {
   });
 
   const precio = (valor: number) =>
-    valor.toLocaleString("es-CL", {
+    Number(valor || 0).toLocaleString("es-CL", {
       style: "currency",
       currency: "CLP",
       maximumFractionDigits: 0
@@ -78,7 +77,7 @@ export default function HomePage() {
 
     try {
       const datos = await InventarioService.consultarPorZapatilla(producto.id);
-      const disponibles = datos.filter(item => item.cantidadDisponible > 0);
+      const disponibles = datos.filter(item => Number(item.cantidadDisponible) > 0);
       setInventarios(disponibles);
 
       if (!disponibles.length) {
@@ -406,7 +405,7 @@ export default function HomePage() {
                 >
                   <option value="">Seleccionar talla</option>
                   {inventarios.map(item => (
-                    <option key={item.id} value={item.talla}>
+                    <option key={item.id ?? item.talla} value={item.talla}>
                       Talla {item.talla} — Stock: {item.cantidadDisponible}
                     </option>
                   ))}

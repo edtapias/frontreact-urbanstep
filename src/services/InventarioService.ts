@@ -1,9 +1,10 @@
-
 import axios from "axios";
 
-// Conexión con el microservicio de inventario.
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "/api";
+
 const inventarioApi = axios.create({
-  baseURL: "/api/inventario",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -11,219 +12,120 @@ const inventarioApi = axios.create({
   timeout: 15000,
 });
 
-// Estructura del inventario.
-export interface Inventario {
-  id: number;
+export interface RegistroInventario {
+  id?: number;
   zapatillaId: number;
   talla: string;
-  sucursal: string;
   cantidadDisponible: number;
-  umbralMinimo: number;
-  ultimaActualizacion: string;
+  sucursal?: string;
 }
 
-// Estructura de los movimientos.
-export interface MovimientoInventario {
-  id: number;
-  cantidad: number;
-  fechaMovimiento: string;
-  observacion: string;
-  tipoMovimiento: "ENTRADA" | "SALIDA";
-}
+// Alias para mantener compatibilidad si algún componente importa `Inventario`
+export type Inventario = RegistroInventario;
 
-// Datos para registrar movimientos.
-export interface RegistrarMovimientoDTO {
-  tipoMovimiento: "ENTRADA" | "SALIDA";
-  cantidad: number;
-  observacion: string;
-}
+const normalizarTalla = (talla: string): string =>
+  String(talla ?? "").trim().toLowerCase();
 
 const InventarioService = {
-
-  // =====================================================
-  // LISTAR TODOS LOS REGISTROS DE INVENTARIO
-  // =====================================================
-  listar: async (): Promise<Inventario[]> => {
-    try {
-      const respuesta = await inventarioApi.get("");
-
-      const datos = respuesta.data;
-
-      if (Array.isArray(datos)) {
-        return datos;
-      }
-
-      if (Array.isArray(datos?.content)) {
-        return datos.content;
-      }
-
-      console.error("Formato de inventario inesperado:", datos);
-
-      throw new Error(
-        "El backend no devolvió una lista de inventario."
-      );
-
-    } catch (error) {
-      console.error("Error al listar inventario:", error);
-      throw error;
-    }
+  async listar(): Promise<RegistroInventario[]> {
+    const { data } = await inventarioApi.get<RegistroInventario[]>(
+      "/inventario"
+    );
+    return Array.isArray(data) ? data : [];
   },
 
-  // =====================================================
-  // CONSULTAR INVENTARIO DE UNA ZAPATILLA
-  // =====================================================
-  consultarPorZapatilla: async (
+  async listarPorZapatilla(
     zapatillaId: number
-  ): Promise<Inventario[]> => {
-    try {
-      const respuesta = await inventarioApi.get(
-        `/zapatilla/${zapatillaId}`
-      );
-
-      return respuesta.data;
-
-    } catch (error) {
-      console.error("Error al consultar inventario:", error);
-      throw error;
-    }
+  ): Promise<RegistroInventario[]> {
+    const { data } = await inventarioApi.get<RegistroInventario[]>(
+      `/inventario/zapatilla/${zapatillaId}`
+    );
+    return Array.isArray(data) ? data : [];
   },
 
-  // =====================================================
-  // CONSULTAR INVENTARIO CRÍTICO
-  // =====================================================
-  consultarCritico: async (): Promise<Inventario[]> => {
-    try {
-      const respuesta = await inventarioApi.get("/critico");
-
-      return respuesta.data;
-
-    } catch (error) {
-      console.error("Error al consultar stock crítico:", error);
-      throw error;
-    }
+  async consultarPorZapatilla(
+    zapatillaId: number
+  ): Promise<RegistroInventario[]> {
+    return this.listarPorZapatilla(zapatillaId);
   },
 
-  // =====================================================
-  // REGISTRAR ENTRADA O SALIDA DE STOCK
-  // =====================================================
-  registrarMovimiento: async (
+  async registrarTalla(
+    payload: RegistroInventario
+  ): Promise<RegistroInventario> {
+    const { data } = await inventarioApi.post<RegistroInventario>(
+      "/inventario",
+      {
+        zapatillaId: payload.zapatillaId,
+        talla: payload.talla.trim(),
+        cantidadDisponible: payload.cantidadDisponible,
+        sucursal: payload.sucursal ?? "Bodega Central",
+      }
+    );
+    return data;
+  },
+
+  async registrarMovimiento(
     inventarioId: number,
-    datos: RegistrarMovimientoDTO
-  ): Promise<Inventario> => {
-    try {
-      const respuesta = await inventarioApi.post(
-        `/${inventarioId}/movimiento`,
-        datos
-      );
-
-      return respuesta.data;
-
-    } catch (error) {
-      console.error("Error al registrar movimiento:", error);
-      throw error;
-    }
+    tipoMovimiento: "ENTRADA" | "SALIDA",
+    cantidad: number,
+    observacion?: string
+  ): Promise<RegistroInventario> {
+    const { data } = await inventarioApi.post<RegistroInventario>(
+      `/inventario/${inventarioId}/movimiento`,
+      {
+        tipoMovimiento,
+        cantidad,
+        observacion,
+      }
+    );
+    return data;
   },
 
-  // =====================================================
-  // CONSULTAR HISTORIAL DE MOVIMIENTOS
-  // =====================================================
-  consultarHistorial: async (
-    inventarioId: number
-  ): Promise<MovimientoInventario[]> => {
-    try {
-      const respuesta = await inventarioApi.get(
-        `/${inventarioId}/historial`
-      );
-
-      return respuesta.data;
-
-    } catch (error) {
-      console.error("Error al consultar historial:", error);
-      throw error;
-    }
-  },
-
-  // =====================================================
-  // ACTUALIZAR STOCK A UNA CANTIDAD DETERMINADA
-  // =====================================================
-  actualizarStock: async (
+  // Registra la talla si no existe para esa zapatilla, o ajusta el stock si ya existe
+  async actualizarStock(
     zapatillaId: number,
     talla: string,
-    nuevoStock: number
-  ): Promise<Inventario> => {
-    try {
+    cantidadObjetivo: number
+  ): Promise<RegistroInventario> {
+    const tallaLimpia = talla.trim();
+    const registros = await this.listarPorZapatilla(zapatillaId);
 
-      // Validar cantidad.
-      if (
-        !Number.isInteger(nuevoStock) ||
-        nuevoStock < 0
-      ) {
-        throw new Error(
-          "El stock debe ser un número entero mayor o igual a cero."
-        );
-      }
+    const existente = registros.find(
+      (item) => normalizarTalla(item.talla) === normalizarTalla(tallaLimpia)
+    );
 
-      // Consultar los registros de la zapatilla.
-      const registros =
-        await InventarioService.consultarPorZapatilla(
-          zapatillaId
-        );
-
-      // Buscar el registro correspondiente a la talla y sucursal.
-      const inventario = registros.find(
-        (item) =>
-          String(item.talla).trim().toLowerCase() ===
-            String(talla).trim().toLowerCase() &&
-          item.sucursal === "Bodega Central"
-      );
-
-      // Si no existe, crear el registro.
-      if (!inventario) {
-        const respuesta = await inventarioApi.post("", {
-          zapatillaId,
-          talla,
-          sucursal: "Bodega Central",
-          cantidadDisponible: nuevoStock,
-          umbralMinimo: 5,
-        });
-
-        return respuesta.data;
-      }
-
-      // Calcular diferencia entre stock actual y nuevo.
-      const stockActual = Number(
-        inventario.cantidadDisponible || 0
-      );
-
-      const diferencia = nuevoStock - stockActual;
-
-      // Si no hay cambios, devolver el inventario actual.
-      if (diferencia === 0) {
-        return inventario;
-      }
-
-      // Registrar entrada o salida según corresponda.
-      const movimiento: RegistrarMovimientoDTO = {
-        tipoMovimiento:
-          diferencia > 0 ? "ENTRADA" : "SALIDA",
-
-        cantidad: Math.abs(diferencia),
-
-        observacion:
-          "Actualización de stock desde gestión de productos",
-      };
-
-      return await InventarioService.registrarMovimiento(
-        inventario.id,
-        movimiento
-      );
-
-    } catch (error) {
-      console.error("Error al actualizar stock:", error);
-      throw error;
+    if (!existente || !existente.id) {
+      return this.registrarTalla({
+        zapatillaId,
+        talla: tallaLimpia,
+        cantidadDisponible: cantidadObjetivo,
+        sucursal: "Bodega Central",
+      });
     }
-  },
 
+    const actual = Number(existente.cantidadDisponible ?? 0);
+    const diferencia = cantidadObjetivo - actual;
+
+    if (diferencia > 0) {
+      return this.registrarMovimiento(
+        existente.id,
+        "ENTRADA",
+        diferencia,
+        "Actualización de stock desde gestión de productos"
+      );
+    }
+
+    if (diferencia < 0) {
+      return this.registrarMovimiento(
+        existente.id,
+        "SALIDA",
+        Math.abs(diferencia),
+        "Ajuste de stock desde gestión de productos"
+      );
+    }
+
+    return existente;
+  },
 };
 
 export default InventarioService;

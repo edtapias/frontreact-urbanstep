@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -15,15 +14,50 @@ import InventarioService, {
 
 type TallaStock = {
   talla: string;
-  stock: number;
+  stock: string;
 };
 
-const formularioInicial: ProductoPayload = {
+type FormularioProducto = Omit<
+  ProductoPayload,
+  "precio" | "stock"
+> & {
+  precio: string;
+  stock: string;
+};
+
+const normalizarTalla = (valor: string): string =>
+  String(valor ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("es");
+
+const normalizarTexto = (valor: string): string =>
+  String(valor ?? "")
+    .trim()
+    .toLocaleLowerCase("es");
+
+const esMismaZapatilla = (
+  producto: Producto,
+  referencia: Producto
+): boolean =>
+  normalizarTexto(producto.nombre) ===
+    normalizarTexto(referencia.nombre) &&
+  normalizarTexto(producto.marca) ===
+    normalizarTexto(referencia.marca) &&
+  normalizarTexto(producto.color) ===
+    normalizarTexto(referencia.color) &&
+  normalizarTexto(producto.imagenUrl) ===
+    normalizarTexto(referencia.imagenUrl) &&
+  Number(producto.categoria?.id) ===
+    Number(referencia.categoria?.id) &&
+  Number(producto.precio) === Number(referencia.precio);
+
+const formularioInicial: FormularioProducto = {
   nombre: "",
   marca: "",
   color: "",
-  precio: 0,
-  stock: 0,
+  precio: "",
+  stock: "",
   imagenUrl: "",
   talla: "",
   destacado: false,
@@ -48,11 +82,17 @@ export default function ProductosPage() {
   const [errorInventario, setErrorInventario] = useState("");
 
   const [formulario, setFormulario] =
-    useState<ProductoPayload>(formularioInicial);
+    useState<FormularioProducto>(formularioInicial);
 
   const [tallas, setTallas] = useState<TallaStock[]>([
-    { talla: "", stock: 0 },
+    { talla: "", stock: "" },
   ]);
+
+  const [variantesEditando, setVariantesEditando] = useState<
+    Producto[]
+  >([]);
+
+  const [advertenciaTallas, setAdvertenciaTallas] = useState("");
 
   const [productoEditando, setProductoEditando] =
     useState<number | null>(null);
@@ -60,12 +100,10 @@ export default function ProductosPage() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // REFERENCIA Y ESTADO DE LA IMAGEN
   const inputImagenRef = useRef<HTMLInputElement>(null);
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [vistaPrevia, setVistaPrevia] = useState("");
 
-  // SELECCIONAR IMAGEN DESDE EL COMPUTADOR
   const seleccionarImagen = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -108,7 +146,6 @@ export default function ProductosPage() {
     lector.readAsDataURL(archivo);
   };
 
-  // Cargar inventario
   const cargarInventario = useCallback(async () => {
     try {
       setErrorInventario("");
@@ -153,7 +190,6 @@ export default function ProductosPage() {
     };
   }, [cargarInventario]);
 
-  // Obtener stock real de una zapatilla
   const obtenerStockReal = (zapatillaId: number): number => {
     return inventario
       .filter((item) => item.zapatillaId === zapatillaId)
@@ -164,15 +200,33 @@ export default function ProductosPage() {
       );
   };
 
-  // Stock total del formulario
-  const stockTotal = tallas.reduce(
-    (total, item) => total + Number(item.stock || 0),
-    0
-  );
+  const obtenerStockPorTalla = (
+    zapatillaId: number,
+    talla: string
+  ): number => {
+    const clave = normalizarTalla(talla);
 
-  // Modificar campos del formulario
+    return inventario
+      .filter(
+        (item) =>
+          item.zapatillaId === zapatillaId &&
+          normalizarTalla(item.talla) === clave
+      )
+      .reduce(
+        (total, item) =>
+          total + Number(item.cantidadDisponible || 0),
+        0
+      );
+  };
+
+  const stockTotal = tallas.reduce((total, item) => {
+    const stock = Number(item.stock);
+
+    return total + (Number.isFinite(stock) && stock > 0 ? stock : 0);
+  }, 0);
+
   const cambiarCampo = (
-    campo: keyof ProductoPayload,
+    campo: keyof FormularioProducto,
     valor: string | number | boolean
   ) => {
     setFormulario((actual) => ({
@@ -181,12 +235,46 @@ export default function ProductosPage() {
     }));
   };
 
-  // Modificar una talla
   const cambiarTalla = (
     indice: number,
     campo: keyof TallaStock,
-    valor: string | number
+    valor: string
   ) => {
+    setAdvertenciaTallas("");
+
+    if (campo === "talla") {
+      const clave = normalizarTalla(valor);
+
+      if (clave) {
+        const indiceExistente = tallas.findIndex(
+          (item, i) =>
+            i !== indice && normalizarTalla(item.talla) === clave
+        );
+
+        if (indiceExistente !== -1) {
+          const stockActualizado = tallas[indice].stock;
+
+          setTallas((actual) =>
+            actual
+              .map((item, i) =>
+                i === indiceExistente
+                  ? { ...item, stock: stockActualizado }
+                  : item
+              )
+              .filter((_, i) => i !== indice)
+          );
+
+          setAdvertenciaTallas(
+            `La talla ${valor.trim()} ya estaba agregada. Se actualizó su stock a ${
+              stockActualizado || "0"
+            } en lugar de duplicarla.`
+          );
+
+          return;
+        }
+      }
+    }
+
     setTallas((actual) =>
       actual.map((item, i) =>
         i === indice
@@ -196,34 +284,36 @@ export default function ProductosPage() {
     );
   };
 
-  // Agregar otra talla
   const agregarTalla = () => {
+    setAdvertenciaTallas("");
+
     setTallas((actual) => [
       ...actual,
-      { talla: "", stock: 0 },
+      { talla: "", stock: "" },
     ]);
   };
 
-  // Eliminar talla
   const eliminarTalla = (indice: number) => {
     if (tallas.length === 1) {
       alert("Debes mantener al menos una talla.");
       return;
     }
 
+    setAdvertenciaTallas("");
     setTallas((actual) =>
       actual.filter((_, i) => i !== indice)
     );
   };
 
-  // Cerrar y limpiar formulario
   const limpiarFormulario = () => {
     setFormulario({
       ...formularioInicial,
       categoria: { ...formularioInicial.categoria },
     });
 
-    setTallas([{ talla: "", stock: 0 }]);
+    setTallas([{ talla: "", stock: "" }]);
+    setVariantesEditando([]);
+    setAdvertenciaTallas("");
     setProductoEditando(null);
     setMostrarFormulario(false);
 
@@ -235,14 +325,17 @@ export default function ProductosPage() {
     }
   };
 
-  // Editar producto
   const editarProducto = (producto: Producto) => {
+    const variantes = productos.filter((item) =>
+      esMismaZapatilla(item, producto)
+    );
+
     setFormulario({
       nombre: producto.nombre,
       marca: producto.marca,
       color: producto.color,
-      precio: producto.precio,
-      stock: obtenerStockReal(producto.id),
+      precio: String(producto.precio),
+      stock: String(obtenerStockReal(producto.id)),
       imagenUrl: producto.imagenUrl || "",
       talla: producto.talla,
       destacado: producto.destacado ?? false,
@@ -254,23 +347,26 @@ export default function ProductosPage() {
 
     setArchivoImagen(null);
     setVistaPrevia("");
+    setAdvertenciaTallas("");
 
     if (inputImagenRef.current) {
       inputImagenRef.current.value = "";
     }
 
-    setTallas([
-      {
-        talla: producto.talla,
-        stock: obtenerStockReal(producto.id),
-      },
-    ]);
+    setVariantesEditando(variantes);
+    setTallas(
+      variantes.map((variante) => ({
+        talla: variante.talla,
+        stock: String(
+          obtenerStockPorTalla(variante.id, variante.talla)
+        ),
+      }))
+    );
 
     setProductoEditando(producto.id);
     setMostrarFormulario(true);
   };
 
-  // Guardar productos y sincronizar inventario
   const guardarProducto = async (
     e: FormEvent<HTMLFormElement>
   ) => {
@@ -283,6 +379,8 @@ export default function ProductosPage() {
 
     const tallasNormalizadas = tallas.map((item) => ({
       talla: item.talla.trim(),
+      clave: normalizarTalla(item.talla),
+      stockTexto: item.stock,
       stock: Number(item.stock),
     }));
 
@@ -294,6 +392,7 @@ export default function ProductosPage() {
     if (
       tallasNormalizadas.some(
         (item) =>
+          item.stockTexto.trim() === "" ||
           !Number.isInteger(item.stock) ||
           !Number.isFinite(item.stock) ||
           item.stock < 0
@@ -303,12 +402,15 @@ export default function ProductosPage() {
       return;
     }
 
-    const tallasUnicas = tallasNormalizadas.map((item) =>
-      item.talla.toLowerCase()
-    );
+    if (
+      new Set(tallasNormalizadas.map((item) => item.clave)).size !==
+      tallasNormalizadas.length
+    ) {
+      const mensaje =
+        "No puedes ingresar la misma talla más de una vez. Revisa las tallas repetidas (sin importar espacios o mayúsculas).";
 
-    if (new Set(tallasUnicas).size !== tallasUnicas.length) {
-      alert("No puedes ingresar la misma talla más de una vez.");
+      setAdvertenciaTallas(mensaje);
+      alert(mensaje);
       return;
     }
 
@@ -320,8 +422,6 @@ export default function ProductosPage() {
       return;
     }
 
-    // Para registrar, debe existir una imagen seleccionada
-    // o una imagen anterior del producto.
     const imagenFinal = vistaPrevia || formulario.imagenUrl;
 
     if (!imagenFinal.trim()) {
@@ -329,11 +429,14 @@ export default function ProductosPage() {
       return;
     }
 
+    const precioNumerico = Number(formulario.precio);
+
     if (
-      !Number.isFinite(Number(formulario.precio)) ||
-      Number(formulario.precio) <= 0
+      formulario.precio.trim() === "" ||
+      !Number.isFinite(precioNumerico) ||
+      precioNumerico < 0
     ) {
-      alert("El precio debe ser mayor que cero.");
+      alert("El precio debe ser un número mayor o igual a cero.");
       return;
     }
 
@@ -348,6 +451,19 @@ export default function ProductosPage() {
     setGuardando(true);
 
     try {
+      // Buscar si ya existe una zapatilla con el mismo nombre y marca
+      // para no volver a llamar a POST /zapatillas y provocar el 400.
+      const zapatillaBaseExistente = productos.find(
+        (item) =>
+          normalizarTexto(item.nombre) ===
+            normalizarTexto(formulario.nombre) &&
+          normalizarTexto(item.marca) ===
+            normalizarTexto(formulario.marca)
+      );
+
+      let zapatillaIdBase: number | null =
+        productoEditando ?? zapatillaBaseExistente?.id ?? null;
+
       for (let i = 0; i < tallasNormalizadas.length; i++) {
         const variante = tallasNormalizadas[i];
 
@@ -355,12 +471,9 @@ export default function ProductosPage() {
           nombre: formulario.nombre.trim(),
           marca: formulario.marca.trim(),
           color: formulario.color.trim(),
-          precio: Number(formulario.precio),
+          precio: precioNumerico,
           stock: variante.stock,
-
-          // Se envía la imagen seleccionada como Data URL.
           imagenUrl: imagenFinal,
-
           talla: variante.talla,
           destacado: Boolean(formulario.destacado),
           categoria: {
@@ -369,11 +482,15 @@ export default function ProductosPage() {
           },
         };
 
+        const productoExistente = variantesEditando.find(
+          (item) => normalizarTalla(item.talla) === variante.clave
+        );
+
         let zapatillaId: number;
 
-        if (productoEditando !== null && i === 0) {
+        if (productoExistente) {
           const actualizado = await actualizar(
-            productoEditando,
+            productoExistente.id,
             payload
           );
 
@@ -383,8 +500,8 @@ export default function ProductosPage() {
             );
           }
 
-          zapatillaId = productoEditando;
-        } else {
+          zapatillaId = productoExistente.id;
+        } else if (zapatillaIdBase === null && i === 0) {
           const nuevoProducto = await crear(payload);
 
           if (!nuevoProducto) {
@@ -394,6 +511,11 @@ export default function ProductosPage() {
           }
 
           zapatillaId = nuevoProducto.id;
+          zapatillaIdBase = nuevoProducto.id;
+        } else {
+          // La zapatilla ya existe en catálogo: usar su ID existente
+          // y registrar/actualizar la talla en inventario.
+          zapatillaId = zapatillaIdBase!;
         }
 
         await InventarioService.actualizarStock(
@@ -406,8 +528,8 @@ export default function ProductosPage() {
       await cargarInventario();
 
       alert(
-        productoEditando !== null
-          ? "Producto actualizado correctamente."
+        productoEditando !== null || zapatillaBaseExistente
+          ? "Producto e inventario actualizados correctamente."
           : "Zapatillas registradas correctamente."
       );
 
@@ -430,7 +552,6 @@ export default function ProductosPage() {
     }
   };
 
-  // Eliminar producto
   const eliminarProducto = async (id: number) => {
     const confirmar = window.confirm(
       "¿Estás seguro de que deseas eliminar este producto?"
@@ -451,7 +572,6 @@ export default function ProductosPage() {
     }
   };
 
-  // Indicadores
   const totalUnidades = productos.reduce(
     (total, producto) =>
       total + obtenerStockReal(producto.id),
@@ -468,7 +588,6 @@ export default function ProductosPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* ENCABEZADO */}
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -491,7 +610,6 @@ export default function ProductosPage() {
         </button>
       </div>
 
-      {/* RESUMEN */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border bg-white p-5 shadow-sm">
           <p className="text-sm text-gray-500">Total de productos</p>
@@ -522,7 +640,6 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* FORMULARIO */}
       {mostrarFormulario && (
         <div className="mb-8 rounded-xl border bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
@@ -543,7 +660,6 @@ export default function ProductosPage() {
 
           <form onSubmit={guardarProducto}>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* NOMBRE */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Nombre
@@ -560,7 +676,6 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* MARCA */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Marca
@@ -577,7 +692,6 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* COLOR */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Color
@@ -594,7 +708,6 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* PRECIO */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Precio
@@ -603,17 +716,17 @@ export default function ProductosPage() {
                 <input
                   required
                   type="number"
-                  min="0.01"
+                  min="0"
                   step="0.01"
                   value={formulario.precio}
                   onChange={(e) =>
-                    cambiarCampo("precio", Number(e.target.value))
+                    cambiarCampo("precio", e.target.value)
                   }
                   className="w-full rounded-lg border p-3 outline-none focus:border-black"
+                  placeholder="Ej: 49990"
                 />
               </div>
 
-              {/* CATEGORÍA */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   ID de categoría
@@ -637,7 +750,6 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* NOMBRE CATEGORÍA */}
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Nombre de categoría
@@ -660,7 +772,6 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* SELECCIONAR IMAGEN */}
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium">
                   Imagen de la zapatilla
@@ -707,7 +818,6 @@ export default function ProductosPage() {
                 </p>
               </div>
 
-              {/* TALLAS Y STOCK */}
               <div className="md:col-span-2">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -738,8 +848,7 @@ export default function ProductosPage() {
 
                         <input
                           required
-                          type="number"
-                          min="1"
+                          type="text"
                           value={item.talla}
                           onChange={(e) =>
                             cambiarTalla(
@@ -749,7 +858,7 @@ export default function ProductosPage() {
                             )
                           }
                           className="w-full rounded-lg border bg-white p-3 outline-none focus:border-black"
-                          placeholder="Ej: 38"
+                          placeholder="Ej: 38 o M"
                         />
                       </div>
 
@@ -768,7 +877,7 @@ export default function ProductosPage() {
                             cambiarTalla(
                               indice,
                               "stock",
-                              Number(e.target.value)
+                              e.target.value
                             )
                           }
                           className="w-full rounded-lg border bg-white p-3 outline-none focus:border-black"
@@ -796,12 +905,17 @@ export default function ProductosPage() {
                   + Agregar otra talla
                 </button>
 
+                {advertenciaTallas && (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    {advertenciaTallas}
+                  </p>
+                )}
+
                 <p className="mt-2 text-xs text-gray-500">
-                  Puedes ingresar stock 0 para una talla sin unidades disponibles.
+                  Puedes ingresar stock 0 para una talla sin unidades disponibles. No se permiten tallas repetidas: si repites una, se actualiza el stock de la talla existente.
                 </p>
               </div>
 
-              {/* DESTACADO */}
               <div className="md:col-span-2">
                 <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 hover:bg-gray-50">
                   <input
@@ -828,7 +942,6 @@ export default function ProductosPage() {
               </div>
             </div>
 
-            {/* BOTONES */}
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
@@ -854,7 +967,6 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {/* ERRORES */}
       {error && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           {error}
@@ -867,7 +979,6 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {/* TABLA */}
       <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
         <div className="border-b p-5">
           <h2 className="text-lg font-bold">
@@ -933,35 +1044,41 @@ export default function ProductosPage() {
                       </td>
 
                       <td className="p-4">{producto.marca}</td>
-                      <td className="p-4">{producto.talla}</td>
 
                       <td className="p-4">
-                        ${producto.precio.toLocaleString("es-CL")}
+                        <span className="rounded bg-gray-100 px-2.5 py-1 font-medium">
+                          {producto.talla}
+                        </span>
+                      </td>
+
+                      <td className="p-4 font-semibold">
+                        ${Number(producto.precio).toLocaleString("es-CL")}
                       </td>
 
                       <td className="p-4">
                         <span
-                          className={
+                          className={`font-semibold ${
                             stockReal > 0
-                              ? "rounded-full bg-green-100 px-3 py-1 text-green-700"
-                              : "rounded-full bg-red-100 px-3 py-1 text-red-700"
-                          }
+                              ? "text-green-700"
+                              : "text-red-600"
+                          }`}
                         >
                           {cargandoInventario ? "..." : stockReal}
                         </span>
                       </td>
 
                       <td className="p-4">
-                        {producto.categoria?.nombre}
+                        {producto.categoria?.nombre ||
+                          `ID ${producto.categoria?.id}`}
                       </td>
 
                       <td className="p-4">
                         {producto.destacado ? (
-                          <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">
+                          <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
                             Sí
                           </span>
                         ) : (
-                          <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
                             No
                           </span>
                         )}
@@ -970,15 +1087,17 @@ export default function ProductosPage() {
                       <td className="p-4">
                         <div className="flex gap-2">
                           <button
+                            type="button"
                             onClick={() => editarProducto(producto)}
-                            className="rounded-lg bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200"
+                            className="rounded-lg border px-3 py-1.5 font-medium hover:bg-gray-100"
                           >
                             Editar
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => eliminarProducto(producto.id)}
-                            className="rounded-lg bg-red-100 px-3 py-2 text-red-700 hover:bg-red-200"
+                            className="rounded-lg border border-red-200 px-3 py-1.5 font-medium text-red-600 hover:bg-red-50"
                           >
                             Eliminar
                           </button>
