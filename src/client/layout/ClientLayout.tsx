@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 import {
@@ -21,8 +20,8 @@ interface Usuario {
 const enlaces = [
   ["Inicio", "/"],
   ["Zapatillas", "/catalogo"],
-  ["Nosotros", "/#nosotros"],
-  ["Contacto", "/#contacto"],
+  ["Nosotros", "/nosotros"],
+  ["Contacto", "/soporte"],
 ];
 
 export default function ClientLayout() {

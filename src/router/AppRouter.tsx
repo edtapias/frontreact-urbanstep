@@ -7,6 +7,7 @@ import MisFavoritosPage from "../client/pages/favoritos/MisFavoritosPage";
 import CarritoPage from "../client/pages/carrito/CarritoPage";
 import PagoPage from "../client/pages/pagos/PagosPage";
 import SoportePage from "../client/pages/soporte/SoportePage";
+import NosotrosPage from "../client/pages/nosotros/NosotrosPage";
 
 import AdminLayout from "../admin/layout/AdminLayout";
 import AdminPage from "../admin/pages/AdminPage";
@@ -36,6 +37,7 @@ export default function AppRouter() {
           <Route path="carrito" element={<CarritoPage />} />
           <Route path="pago" element={<PagoPage />} />
           <Route path="soporte" element={<SoportePage />} />
+          <Route path="nosotros" element={<NosotrosPage />} />
         </Route>
 
         {/* USUARIOS */}
