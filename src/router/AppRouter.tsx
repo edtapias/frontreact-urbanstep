@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from "react-router";
 
 import ClientLayout from "../client/layout/ClientLayout";
@@ -16,6 +15,7 @@ import ProductosPage from "../admin/pages/productos/ProductosPage";
 import AdminPedidosPage from "../admin/pages/AdminPedidosPage";
 import AdminResenasPage from "../admin/pages/AdminResenasPage";
 import AdminEnviosPage from "../admin/pages/envios/AdminEnviosPage";
+import AdminSoportePage from "../admin/pages/soporte/AdminSoportePage";
 import ReportesPage from "../admin/pages/ReportesPage";
 import UsuariosAdminPage from "../admin/pages/usuarios/UsuariosAdminPage";
 
@@ -52,6 +52,7 @@ export default function AppRouter() {
           <Route path="pedidos" element={<AdminPedidosPage />} />
           <Route path="envios" element={<AdminEnviosPage />} />
           <Route path="resenas" element={<AdminResenasPage />} />
+          <Route path="soporte" element={<AdminSoportePage />} />
           <Route path="reportes" element={<ReportesPage />} />
         </Route>
 

@@ -1,4 +1,3 @@
-
 import { Link, Outlet, useNavigate, useLocation } from "react-router";
 import {
   LayoutDashboard,
@@ -9,7 +8,8 @@ import {
   Warehouse,
   MessageSquare,
   Truck,
-  Users
+  Users,
+  LifeBuoy,
 } from "lucide-react";
 
 const opciones = [
@@ -20,6 +20,7 @@ const opciones = [
   ["Pedidos", "/admin/pedidos", ShoppingCart],
   ["Envíos", "/admin/envios", Truck],
   ["Reseñas", "/admin/resenas", MessageSquare],
+  ["Soporte", "/admin/soporte", LifeBuoy],
   ["Reportes", "/admin/reportes", BarChart3],
 ];
 
@@ -45,7 +46,7 @@ export default function AdminLayout() {
             const activo =
               location.pathname === ruta ||
               (ruta !== "/admin" &&
-                location.pathname.startsWith(ruta as string + "/"));
+                location.pathname.startsWith((ruta as string) + "/"));
 
             const Icono = Icon as React.ElementType;
 
