@@ -1,14 +1,6 @@
+import { crearClienteApi } from "../lib/api";
 
-import axios from "axios";
-
-const enviosApi = axios.create({
-  baseURL: "/api/envios",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const enviosApi = crearClienteApi("/api/envios");
 
 export interface Envio {
   id: number;

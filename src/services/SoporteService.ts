@@ -1,3 +1,5 @@
+import { apiFetch } from "../lib/api";
+
 const API_URL = "/api/soporte";
 
 export interface NuevaConsultaSoporte {
@@ -40,7 +42,7 @@ export const SoporteService = {
     if (!motivo) throw new Error("Debes seleccionar un motivo de consulta");
     if (!mensaje) throw new Error("Debes escribir tu consulta");
 
-    const respuesta = await fetch(`${API_URL}/solicitudes`, {
+    const respuesta = await apiFetch(`${API_URL}/solicitudes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +64,7 @@ export const SoporteService = {
   },
 
   async listarPorCliente(clienteId: number): Promise<ConsultaSoporte[]> {
-    const res = await fetch(`${API_URL}/clientes/${clienteId}/solicitudes`);
+    const res = await apiFetch(`${API_URL}/clientes/${clienteId}/solicitudes`);
     if (!res.ok) {
       throw new Error("Error al cargar tus solicitudes de soporte");
     }
@@ -70,7 +72,7 @@ export const SoporteService = {
   },
 
   async listarTodas(): Promise<ConsultaSoporte[]> {
-    const res = await fetch(`${API_URL}/admin/solicitudes`);
+    const res = await apiFetch(`${API_URL}/admin/solicitudes`);
     if (!res.ok) {
       throw new Error("Error al cargar las solicitudes de soporte");
     }
@@ -78,7 +80,7 @@ export const SoporteService = {
   },
 
   async listarRespuestas(solicitudId: number): Promise<RespuestaSoporte[]> {
-    const res = await fetch(`${API_URL}/solicitudes/${solicitudId}/respuestas`);
+    const res = await apiFetch(`${API_URL}/solicitudes/${solicitudId}/respuestas`);
     if (!res.ok) {
       throw new Error("Error al cargar las respuestas del ticket");
     }
@@ -94,7 +96,7 @@ export const SoporteService = {
       throw new Error("La respuesta no puede estar vacía");
     }
 
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_URL}/admin/solicitudes/${solicitudId}/respuestas`,
       {
         method: "POST",
@@ -118,7 +120,7 @@ export const SoporteService = {
     solicitudId: number,
     estado: string
   ): Promise<ConsultaSoporte> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_URL}/admin/solicitudes/${solicitudId}/estado`,
       {
         method: "PATCH",
@@ -139,7 +141,7 @@ export const SoporteService = {
     solicitudId: number,
     categoria: string
   ): Promise<ConsultaSoporte> {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_URL}/admin/solicitudes/${solicitudId}/categoria`,
       {
         method: "PATCH",

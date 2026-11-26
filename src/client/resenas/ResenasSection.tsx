@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import Estrellas from "./Estrellas";
 import { useResenas } from "../../hooks/useResenas";
 import PedidosService, { type Pedido } from "../../services/PedidoService";
+import { getUsuario } from "../../lib/auth";
 
 interface Props {
   zapatillaId: number;
@@ -41,13 +42,12 @@ export default function ResenasSection({ zapatillaId }: Props) {
       setCargandoPedidos(true);
 
       try {
-        const usuarioGuardado = localStorage.getItem("usuario");
+        const usuario = getUsuario<{ id?: number; usuarioId?: number }>();
 
-        if (!usuarioGuardado) {
+        if (!usuario) {
           return;
         }
 
-        const usuario = JSON.parse(usuarioGuardado);
         const id = Number(usuario.id ?? usuario.usuarioId);
 
         if (!id || Number.isNaN(id)) {

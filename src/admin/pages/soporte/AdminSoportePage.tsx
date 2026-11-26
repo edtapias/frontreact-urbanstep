@@ -11,7 +11,8 @@ import {
   SoporteService,
   type ConsultaSoporte,
   type RespuestaSoporte,
-} from "../../../services/SoporteService"
+} from "../../../services/SoporteService";
+import { getUsuario } from "../../../lib/auth"
 
 const ESTADOS = ["PENDIENTE", "EN_REVISION", "RESPONDIDA", "CERRADA"] as const;
 const CATEGORIAS = [
@@ -44,14 +45,7 @@ export default function AdminSoportePage() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const adminId: number | null = (() => {
-    try {
-      const u = JSON.parse(localStorage.getItem("usuario") || "null");
-      return u?.id ?? null;
-    } catch {
-      return null;
-    }
-  })();
+  const adminId: number | null = getUsuario<{ id?: number }>()?.id ?? null;
 
   const cargarSolicitudes = async () => {
     setCargando(true);

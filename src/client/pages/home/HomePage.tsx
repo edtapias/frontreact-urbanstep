@@ -7,6 +7,7 @@ import { useFavoritos } from "../../../hooks/useFavoritos";
 import InventarioService, { type Inventario } from "../../../services/InventarioService";
 import CarritoService from "../../../services/CarritoService";
 import ResenasSection from "../../../client/resenas/ResenasSection";
+import { getUsuario } from "../../../lib/auth";
 
 export default function HomePage() {
   const { productos, cargando, error } = useProductos();
@@ -65,7 +66,7 @@ export default function HomePage() {
 
   // Consultar tallas
   const abrirSelector = async (producto: any) => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "null");
+    const usuario = getUsuario<{ id?: number }>();
     if (!usuario?.id) return navigate("/login");
 
     setProductoSeleccionado(producto);
@@ -97,7 +98,7 @@ export default function HomePage() {
 
   // Agregar al carrito
   const agregarAlCarrito = async () => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "null");
+    const usuario = getUsuario<{ id?: number }>();
 
     if (!usuario?.id) return navigate("/login");
 

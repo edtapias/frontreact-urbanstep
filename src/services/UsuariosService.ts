@@ -1,13 +1,6 @@
-import axios from "axios";
+import { crearClienteApi } from "../lib/api";
 
-const usuariosApi = axios.create({
-  baseURL: "/api/usuarios",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const usuariosApi = crearClienteApi("/api/usuarios");
 
 export interface RegistroUsuarioDTO {
   nombre: string;
@@ -43,6 +36,11 @@ export interface Usuario {
   referencias?: string | null;
 }
 
+/** El login devuelve los datos del usuario mas el JWT. */
+export interface LoginResponse extends Usuario {
+  token: string;
+}
+
 const UsuariosService = {
   registrar: async (datos: RegistroUsuarioDTO): Promise<Usuario> => {
     const respuesta = await usuariosApi.post<Usuario>(
@@ -52,8 +50,8 @@ const UsuariosService = {
     return respuesta.data;
   },
 
-  iniciarSesion: async (datos: LoginDTO): Promise<Usuario> => {
-    const respuesta = await usuariosApi.post<Usuario>(
+  iniciarSesion: async (datos: LoginDTO): Promise<LoginResponse> => {
+    const respuesta = await usuariosApi.post<LoginResponse>(
       "/login",
       datos
     );

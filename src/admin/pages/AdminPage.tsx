@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import { crearClienteApi } from "../../lib/api";
 import { Link } from "react-router";
 
 interface Pedido {
@@ -20,6 +20,7 @@ interface ReporteVentas {
 }
 
 const API = "/api";
+const api = crearClienteApi(API);
 
 const obtenerLista = (data: any): any[] => {
   if (Array.isArray(data)) return data;
@@ -102,11 +103,11 @@ export default function AdminPage() {
 
     try {
       const resultados = await Promise.allSettled([
-        axios.get(`${API}/reportes/ventas?inicio=${inicio}&fin=${fin}`),
-        axios.get(`${API}/pedidos/admin`),
-        axios.get(`${API}/zapatillas`),
-        axios.get(`${API}/usuarios`),
-        axios.get(`${API}/reportes/estados-pedidos`),
+        api.get(`/reportes/ventas?inicio=${inicio}&fin=${fin}`),
+        api.get(`/pedidos/admin`),
+        api.get(`/zapatillas`),
+        api.get(`/usuarios`),
+        api.get(`/reportes/estados-pedidos`),
       ]);
 
       if (resultados[0].status === "fulfilled") {

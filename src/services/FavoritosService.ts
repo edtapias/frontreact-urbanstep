@@ -1,14 +1,6 @@
+import { crearClienteApi } from "../lib/api";
 
-import axios from "axios";
-
-const favoritosApi = axios.create({
-  baseURL: "/api/usuarios",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const favoritosApi = crearClienteApi("/api/usuarios");
 
 export interface FavoritoDTO {
   productoId: number;

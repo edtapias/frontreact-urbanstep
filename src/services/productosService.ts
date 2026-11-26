@@ -1,5 +1,4 @@
-
-import axios from "axios";
+import { crearClienteApi } from "../lib/api";
 
 // Estructura de una categoría
 export interface Categoria {
@@ -38,14 +37,7 @@ export interface ProductoPayload {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "/api";
 
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const apiClient = crearClienteApi(API_BASE_URL);
 
 // Interceptor para mostrar errores completos
 apiClient.interceptors.response.use(

@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import FavoritosService from "../services/FavoritosService";
+import { getUsuario } from "../lib/auth";
 
 export function useFavoritos() {
   const [favoritos, setFavoritos] = useState<number[]>([]);
@@ -10,16 +11,8 @@ export function useFavoritos() {
   // Obtener el usuario que inició sesión.
   let usuarioId: number | null = null;
 
-  try {
-    const usuarioGuardado = localStorage.getItem("usuario");
-    const usuario = usuarioGuardado
-      ? JSON.parse(usuarioGuardado)
-      : null;
-
-    usuarioId = usuario?.id ? Number(usuario.id) : null;
-  } catch {
-    usuarioId = null;
-  }
+  const usuario = getUsuario<{ id?: number }>();
+  usuarioId = usuario?.id ? Number(usuario.id) : null;
 
   // Recuperar favoritos desde la base de datos.
   const cargarFavoritos = useCallback(async () => {

@@ -1,12 +1,6 @@
-import axios from "axios";
+import { crearClienteApi } from "../lib/api";
 
-const catalogoApi = axios.create({
-  baseURL: "/api/zapatillas",
-  headers: {
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const catalogoApi = crearClienteApi("/api/zapatillas");
 
 export interface Zapatilla {
   id: number;

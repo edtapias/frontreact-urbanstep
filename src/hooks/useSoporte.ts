@@ -4,6 +4,7 @@ import {
   type ConsultaSoporte,
   type NuevaConsultaSoporte,
 } from "../services/SoporteService";
+import { getUsuario } from "../lib/auth";
 
 interface UsuarioLocal {
   id?: number;
@@ -13,11 +14,7 @@ interface UsuarioLocal {
 }
 
 function obtenerUsuarioLocal(): UsuarioLocal | null {
-  try {
-    return JSON.parse(localStorage.getItem("usuario") || "null");
-  } catch {
-    return null;
-  }
+  return getUsuario<UsuarioLocal>();
 }
 
 function crearEstadoInicial(): NuevaConsultaSoporte {

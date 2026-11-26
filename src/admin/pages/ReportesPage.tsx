@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { apiFetch } from "../../lib/api";
 
 const API = "/api/reportes";
 
@@ -37,7 +38,7 @@ export default function ReportesPage() {
         inventario: "/inventario",
       };
 
-      const res = await fetch(API + rutas[t]);
+      const res = await apiFetch(API + rutas[t]);
       if (!res.ok) throw new Error("No se pudo generar el reporte.");
       setResultado(await res.json());
     } catch (err) {

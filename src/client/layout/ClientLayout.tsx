@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 import {
+  cerrarSesion,
+  escucharCierreSesion,
+  getUsuario,
+} from "../../lib/auth";
+import {
   ShoppingBag,
   Menu,
   UserRound,
@@ -30,24 +35,13 @@ export default function ClientLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const cargarUsuario = () => {
-      try {
-        const guardado = localStorage.getItem("usuario");
-        setUsuario(guardado ? JSON.parse(guardado) : null);
-      } catch {
-        localStorage.removeItem("usuario");
-        setUsuario(null);
-      }
-    };
-
+    const cargarUsuario = () => setUsuario(getUsuario<Usuario>());
     cargarUsuario();
-    window.addEventListener("storage", cargarUsuario);
-
-    return () => window.removeEventListener("storage", cargarUsuario);
+    return escucharCierreSesion(cargarUsuario);
   }, []);
 
-  const cerrarSesion = () => {
-    localStorage.removeItem("usuario");
+  const salir = () => {
+    cerrarSesion();
     setUsuario(null);
     setMenuAbierto(false);
     navigate("/");
@@ -98,7 +92,7 @@ export default function ClientLayout() {
                 )}
 
                 <button
-                  onClick={cerrarSesion}
+                  onClick={salir}
                   className="hidden items-center gap-2 text-sm sm:flex"
                 >
                   <LogOut size={19} />
@@ -180,7 +174,7 @@ export default function ClientLayout() {
                 )}
 
                 <button
-                  onClick={cerrarSesion}
+                  onClick={salir}
                   className="text-left text-red-700"
                 >
                   Cerrar sesión

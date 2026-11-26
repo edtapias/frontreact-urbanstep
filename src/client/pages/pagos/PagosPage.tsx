@@ -19,6 +19,7 @@ import PagoService, {
   type Pago,
   type PagoRequest,
 } from "../../../services/PagosService";
+import { getUsuario } from "../../../lib/auth";
 
 import CarritoService, {
   type Carrito,
@@ -86,14 +87,12 @@ export default function PagoPage() {
 
     async function cargarDatos() {
       try {
-        const usuarioGuardado = localStorage.getItem("usuario");
+        const usuarioLocal = getUsuario<Usuario>();
 
-        if (!usuarioGuardado) {
+        if (!usuarioLocal) {
           navigate("/login");
           return;
         }
-
-        const usuarioLocal: Usuario = JSON.parse(usuarioGuardado);
 
         if (!usuarioLocal.id) {
           throw new Error("No se encontró el ID del usuario.");

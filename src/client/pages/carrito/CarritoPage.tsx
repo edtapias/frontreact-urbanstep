@@ -14,6 +14,7 @@ import {
 import CarritoService, {
   type Carrito,
 } from "../../../services/CarritoService";
+import { getUsuario } from "../../../lib/auth";
 
 export default function CarritoPage() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function CarritoPage() {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
 
-  const usuario = JSON.parse(localStorage.getItem("usuario") || "null");
+  const usuario = getUsuario<{ id?: number }>();
 
   const clienteId: number | null = usuario?.id
     ? Number(usuario.id)

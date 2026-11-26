@@ -1,12 +1,6 @@
+import { crearClienteApi } from "../lib/api";
 
-import axios from "axios";
-
-const pagoApi = axios.create({
-  baseURL: "/api/pagos",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const pagoApi = crearClienteApi("/api/pagos");
 
 export interface ProductoCompra {
   zapatillaId: number;

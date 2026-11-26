@@ -114,7 +114,7 @@ export default function InventarioPage() {
     return (
       String(item.zapatillaId).includes(termino) ||
       item.talla.toLowerCase().includes(termino) ||
-      item.sucursal.toLowerCase().includes(termino) ||
+      (item.sucursal ?? "").toLowerCase().includes(termino) ||
       zapatilla?.nombre.toLowerCase().includes(termino) ||
       zapatilla?.marca.toLowerCase().includes(termino)
     );
@@ -128,7 +128,7 @@ export default function InventarioPage() {
 
   const stockCritico = inventario.filter(
     (item) =>
-      Number(item.cantidadDisponible) <= Number(item.umbralMinimo)
+      Number(item.cantidadDisponible) <= Number(item.umbralMinimo ?? 5)
   ).length;
 
   // Abrir formulario de movimiento.
@@ -149,8 +149,9 @@ export default function InventarioPage() {
   ) => {
     e.preventDefault();
 
-    if (!registroSeleccionado) return;
+    if (!registroSeleccionado?.id) return;
 
+    const inventarioId = registroSeleccionado.id;
     const cantidadNumerica = Number(cantidad);
 
     if (!Number.isInteger(cantidadNumerica) || cantidadNumerica <= 0) {
@@ -170,12 +171,10 @@ export default function InventarioPage() {
       setGuardando(true);
 
       await InventarioService.registrarMovimiento(
-        registroSeleccionado.id,
-        {
-          tipoMovimiento,
-          cantidad: cantidadNumerica,
-          observacion,
-        }
+        inventarioId,
+        tipoMovimiento,
+        cantidadNumerica,
+        observacion
       );
 
       alert("Movimiento registrado correctamente.");
@@ -198,13 +197,15 @@ export default function InventarioPage() {
 
   // Consultar historial.
   const verHistorial = async (item: Inventario) => {
+    if (!item.id) return;
+
     try {
       setRegistroSeleccionado(item);
       setCargandoHistorial(true);
       setHistorial([]);
       setMostrarHistorial(true);
 
-      const datos = await InventarioService.consultarHistorial(item.id);
+      const datos = await InventarioService.consultarHistorial(item.id!);
 
       setHistorial(datos);
     } catch (err) {
@@ -374,7 +375,7 @@ export default function InventarioPage() {
                 {inventarioFiltrado.map((item) => {
                   const critico =
                     Number(item.cantidadDisponible) <=
-                    Number(item.umbralMinimo);
+                    Number(item.umbralMinimo ?? 5);
 
                   const zapatilla = obtenerZapatilla(item.zapatillaId);
 
@@ -431,7 +432,7 @@ export default function InventarioPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        {item.umbralMinimo}
+                        {item.umbralMinimo ?? 5}
                       </td>
 
                       <td className="px-5 py-4">

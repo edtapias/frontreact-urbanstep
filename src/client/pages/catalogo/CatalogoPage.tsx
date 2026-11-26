@@ -17,6 +17,7 @@ import InventarioService, {
 } from "../../../services/InventarioService";
 import CarritoService from "../../../services/CarritoService";
 import ResenasSection from "../../resenas/ResenasSection";
+import { getUsuario } from "../../../lib/auth";
 
 export default function CatalogoPage() {
   const { productos, cargando, error } = useProductos();
@@ -84,7 +85,7 @@ export default function CatalogoPage() {
   };
 
   const abrirSelector = async (producto: any) => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "null");
+    const usuario = getUsuario<{ id?: number }>();
 
     if (!usuario?.id) {
       navigate("/login");
@@ -124,7 +125,7 @@ export default function CatalogoPage() {
   );
 
   const agregarAlCarrito = async () => {
-    const usuario = JSON.parse(localStorage.getItem("usuario") || "null");
+    const usuario = getUsuario<{ id?: number }>();
 
     if (!usuario?.id) {
       navigate("/login");

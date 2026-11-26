@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import usuariosApi from "../client/api/usuariosApi";
 
@@ -29,7 +28,6 @@ export function useUsuarios() {
       setTodosUsuarios(response.data);
 
       console.log("Usuarios cargados:", response.data);
-
     } catch (err) {
       console.error("Error al cargar usuarios:", err);
       setError("No fue posible cargar los usuarios.");
@@ -79,7 +77,6 @@ export function useUsuarios() {
       await cargarUsuarios();
 
       return true;
-
     } catch (err) {
       console.error("Error al actualizar usuario:", err);
       setError("No fue posible actualizar el usuario.");

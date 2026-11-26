@@ -16,6 +16,7 @@ import {
 
 import UsuariosService from "../../../services/UsuariosService";
 import type { Usuario } from "../../../services/UsuariosService";
+import { cerrarSesion, getUsuario, guardarUsuario } from "../../../lib/auth";
 
 import PedidosService from "../../../services/PedidoService";
 import type { Pedido } from "../../../services/PedidoService";
@@ -49,15 +50,14 @@ export default function PerfilPage() {
   // Cargar usuario desde la base de datos
   useEffect(() => {
     const cargarPerfil = async () => {
-      const usuarioGuardado = localStorage.getItem("usuario");
+      const datos = getUsuario<Usuario>();
 
-      if (!usuarioGuardado) {
+      if (!datos) {
         navigate("/login");
         return;
       }
 
       try {
-        const datos: Usuario = JSON.parse(usuarioGuardado);
 
         if (!datos.id) {
           throw new Error("No se encontró el ID del usuario.");
@@ -78,8 +78,8 @@ export default function PerfilPage() {
         setDireccion(respuesta.direccion || "");
         setReferencias(respuesta.referencias || "");
 
-        // Actualizar localStorage
-        localStorage.setItem("usuario", JSON.stringify(respuesta));
+        // Actualizar localStorage sin perder el token
+        guardarUsuario(respuesta);
 
         // Cargar historial de pedidos
         cargarPedidos(respuesta.id);
@@ -148,7 +148,7 @@ export default function PerfilPage() {
       setUsuario(respuesta);
 
       // Actualizar información guardada en el navegador
-      localStorage.setItem("usuario", JSON.stringify(respuesta));
+      guardarUsuario(respuesta);
 
       // Sincronizar los campos con la respuesta del backend
       setNombre(respuesta.nombre || "");
@@ -173,8 +173,8 @@ export default function PerfilPage() {
   };
 
   // Cerrar sesión
-  const cerrarSesion = () => {
-    localStorage.removeItem("usuario");
+  const salir = () => {
+    cerrarSesion();
     navigate("/login");
   };
 
@@ -252,7 +252,7 @@ export default function PerfilPage() {
           </Link>
 
           <button
-            onClick={cerrarSesion}
+            onClick={salir}
             className="inline-flex items-center gap-2 rounded-lg border border-[#D8D1C8] px-4 py-2 text-sm text-[#393632] hover:bg-[#E5E0D8]"
           >
             <LogOut size={17} />

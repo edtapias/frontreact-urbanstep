@@ -32,9 +32,9 @@ export default defineConfig({
         changeOrigin: true,
       },
 
-      // Microservicio de reseñas
+      // Reseñas: también pasa por el Gateway para validar el JWT
       "/api/resenas": {
-        target: "http://localhost:8091",
+        target: "http://localhost:8088",
         changeOrigin: true,
       },
 

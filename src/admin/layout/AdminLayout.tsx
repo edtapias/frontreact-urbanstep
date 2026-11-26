@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router";
+import { cerrarSesion, getUsuario, tokenExpirado } from "../../lib/auth";
 import {
   LayoutDashboard,
   Package,
@@ -11,6 +13,11 @@ import {
   Users,
   LifeBuoy,
 } from "lucide-react";
+
+interface UsuarioSesion {
+  rol?: string;
+  [clave: string]: unknown;
+}
 
 const opciones = [
   ["Dashboard", "/admin", LayoutDashboard],
@@ -27,6 +34,25 @@ const opciones = [
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const usuario = getUsuario<UsuarioSesion>();
+  const expirado = tokenExpirado();
+  const esAdmin = Boolean(usuario && !expirado && usuario.rol === "ADMINISTRADOR");
+
+  useEffect(() => {
+    if (!usuario || expirado) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    if (usuario.rol !== "ADMINISTRADOR") {
+      navigate("/", { replace: true });
+    }
+  }, [usuario, expirado, navigate]);
+
+  if (!esAdmin) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F5F3EF] text-[#393632]">
@@ -69,7 +95,7 @@ export default function AdminLayout() {
 
         <button
           onClick={() => {
-            localStorage.removeItem("usuario");
+            cerrarSesion();
             navigate("/login");
           }}
           className="mt-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-[#77716A] hover:text-red-600"

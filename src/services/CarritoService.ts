@@ -1,23 +1,9 @@
+import { crearClienteApi } from "../lib/api";
 
-import axios from "axios";
+const carritoApi = crearClienteApi("/api/carrito");
 
-const carritoApi = axios.create({
-  baseURL: "/api/carrito",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
-
-// Consulta los productos en el microservicio de catálogo (puerto 8080)
-const catalogoApi = axios.create({
-  baseURL: "/api",
-  headers: {
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+// Consulta los productos en el catálogo a través del Gateway (/api/zapatillas)
+const catalogoApi = crearClienteApi("/api");
 
 export interface ItemCarrito {
   id: number;

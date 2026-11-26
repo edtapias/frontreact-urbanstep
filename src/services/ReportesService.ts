@@ -1,14 +1,6 @@
+import { crearClienteApi } from "../lib/api";
 
-import axios from "axios";
-
-const reportesApi = axios.create({
-  baseURL: "/api/reportes",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const reportesApi = crearClienteApi("/api/reportes");
 
 export interface ReporteVentas {
   inicio: string;

@@ -1,3 +1,4 @@
+import { apiFetch } from "../lib/api";
 
 const API_URL = "/api/resenas";
 
@@ -34,7 +35,7 @@ export const ResenasService = {
     if (!datos.comentario.trim())
       throw new Error("Debes escribir un comentario");
 
-    const respuesta = await fetch(API_URL, {
+    const respuesta = await apiFetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
@@ -51,7 +52,7 @@ export const ResenasService = {
     puntuacion?: number
   ): Promise<Resena[]> {
     const query = puntuacion ? `?puntuacion=${puntuacion}` : "";
-    const respuesta = await fetch(
+    const respuesta = await apiFetch(
       `${API_URL}/zapatilla/${zapatillaId}${query}`
     );
 
@@ -61,7 +62,7 @@ export const ResenasService = {
   },
 
   async obtenerPendientes(): Promise<Resena[]> {
-    const respuesta = await fetch(`${API_URL}/pendientes`);
+    const respuesta = await apiFetch(`${API_URL}/pendientes`);
 
     if (!respuesta.ok) throw new Error("Error al obtener reseñas pendientes");
 
@@ -69,7 +70,7 @@ export const ResenasService = {
   },
 
   async moderar(id: number, estado: EstadoModeracion): Promise<Resena> {
-    const respuesta = await fetch(`${API_URL}/${id}/moderar`, {
+    const respuesta = await apiFetch(`${API_URL}/${id}/moderar`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado }),

@@ -1,16 +1,9 @@
-import axios from "axios";
+import { crearClienteApi } from "../lib/api";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "/api";
 
-const inventarioApi = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 15000,
-});
+const inventarioApi = crearClienteApi(API_BASE_URL);
 
 export interface RegistroInventario {
   id?: number;
@@ -18,6 +11,15 @@ export interface RegistroInventario {
   talla: string;
   cantidadDisponible: number;
   sucursal?: string;
+  umbralMinimo?: number;
+}
+
+export interface MovimientoInventario {
+  id?: number;
+  tipoMovimiento: "ENTRADA" | "SALIDA";
+  cantidad: number;
+  fechaMovimiento?: string;
+  observacion?: string;
 }
 
 // Alias para mantener compatibilidad si algún componente importa `Inventario`
@@ -62,6 +64,15 @@ const InventarioService = {
       }
     );
     return data;
+  },
+
+  async consultarHistorial(
+    inventarioId: number
+  ): Promise<MovimientoInventario[]> {
+    const { data } = await inventarioApi.get<MovimientoInventario[]>(
+      `/inventario/${inventarioId}/historial`
+    );
+    return Array.isArray(data) ? data : [];
   },
 
   async registrarMovimiento(

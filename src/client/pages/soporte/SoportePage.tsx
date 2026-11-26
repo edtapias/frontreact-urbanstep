@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Search,
 } from "lucide-react";
+import { apiFetch } from "../../../lib/api";
+import { getUsuario } from "../../../lib/auth";
 import { useSoporte } from "../../../hooks/useSoporte";
 import {
   SoporteService,
@@ -55,14 +57,11 @@ export default function SoportePage() {
   >([]);
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
-  const usuarioActual: { id?: number; nombre?: string; correo?: string } | null =
-    (() => {
-      try {
-        return JSON.parse(localStorage.getItem("usuario") || "null");
-      } catch {
-        return null;
-      }
-    })();
+  const usuarioActual = getUsuario<{
+    id?: number;
+    nombre?: string;
+    correo?: string;
+  }>();
 
   const clienteId = usuarioActual?.id ?? null;
 
@@ -112,7 +111,7 @@ export default function SoportePage() {
     setRespuestasTicketBuscado([]);
 
     try {
-      const resSol = await fetch(`/api/soporte/solicitudes/${idNum}`);
+      const resSol = await apiFetch(`/api/soporte/solicitudes/${idNum}`);
       if (!resSol.ok) {
         throw new Error(`No se encontró el Ticket #${idNum}`);
       }
